@@ -117,3 +117,7 @@ footer a:hover {
 .playoff-pick{min-height:68px;padding:14px 16px}
 .playoff-week-tabs{margin-top:2px}
 @media(max-width:800px){.playoff-progress{text-align:left}.playoff-schedule-card .section-head{align-items:flex-start;flex-direction:column;gap:6px}.playoff-game-list{gap:24px}}
+
+/* v3.4 Playoff Machine refinements */
+.playoff-machine-main{padding-top:28px}
+.playoff-team-label{display:none}
