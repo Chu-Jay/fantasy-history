@@ -6,7 +6,7 @@ const ROOT=document.body.dataset.root||'';
 const FALLBACK_LOGO=ROOT+'league-logo.png';
 function assetPath(src){src=String(src||'').trim();if(!src)return FALLBACK_LOGO;if(/^(?:https?:)?\/\//i.test(src)||src.startsWith('data:')||src.startsWith('/'))return src;return ROOT+src.replace(/^\.\//,'')}
 function setupNav(){const b=document.querySelector('#navToggle'),s=document.querySelector('#sidebar');if(b&&s){b.addEventListener('click',()=>s.classList.toggle('open'));document.addEventListener('click',e=>{if(innerWidth<=850&&s.classList.contains('open')&&!s.contains(e.target)&&e.target!==b)s.classList.remove('open')})}}
-async function load(){setupNav();try{const page=document.body.dataset.page||'home';const needed=(page==='records'||page==='managers'||page==='research'||page==='dynasty'||page==='power-rankings')?[URLS.ledger,URLS.settings]:[URLS.ledger,URLS.settings,URLS.home];const texts=await Promise.all(needed.map(u=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.text()})));const lr=csv(texts[0]),sr=csv(texts[1]);ledger=lr.slice(1).filter(r=>r[0]&&r[3]&&r[4]).map(r=>({owner:r[0].trim(),score:num(r[1]),opponent:r[2].trim(),year:String(r[3]).replace(/\.0$/,''),week:r[4].trim(),team:(r[5]||r[0]).trim(),oppScore:num(r[6]),outcome:(r[7]||'').trim().toLowerCase(),diff:num(r[12]),median:num(r[8]),weekRank:num(r[10]),consistency:num(r[11]),winStreak:num(r[14]),lossStreak:num(r[16]),medianOutcome:(r[9]||'').trim().toLowerCase(),seasonPoints:nullableNum(r[18]),seasonFinalPoints:nullableNum(r[20]),likelihood:parsePercent(r[22]),oppLikelihood:parsePercent(r[23])}));parseTeams(sr);if(page==='records'){renderRecords();document.querySelector('#status').textContent='Live records loaded';return}if(page==='managers'){setupManagerPage();document.querySelector('#status').textContent='Live manager history loaded';return}if(page==='research'){setupResearchPage();document.querySelector('#status').textContent='Live research data loaded';return}if(page==='dynasty'){setupDynastyPage();document.querySelector('#status').textContent='Live dynasty data loaded';return}if(page==='power-rankings'){setupPowerRankingsPage();document.querySelector('#status').textContent='Live power rankings loaded';return}const hr=csv(texts[2]);renderLeague(sr);parseChampions(hr);renderChampion();renderShrine();setupSelectors();document.querySelector('#status').textContent='Live data loaded'}catch(e){const status=document.querySelector('#status');if(status)status.textContent='Could not load live data';console.error(e)}}
+async function load(){setupNav();try{const page=document.body.dataset.page||'home';const needed=(page==='records'||page==='managers'||page==='research'||page==='dynasty'||page==='power-rankings'||page==='schedule-comparison')?[URLS.ledger,URLS.settings]:[URLS.ledger,URLS.settings,URLS.home];const texts=await Promise.all(needed.map(u=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.text()})));const lr=csv(texts[0]),sr=csv(texts[1]);ledger=lr.slice(1).filter(r=>r[0]&&r[3]&&r[4]).map(r=>({owner:r[0].trim(),score:num(r[1]),opponent:r[2].trim(),year:String(r[3]).replace(/\.0$/,''),week:r[4].trim(),team:(r[5]||r[0]).trim(),oppScore:num(r[6]),outcome:(r[7]||'').trim().toLowerCase(),diff:num(r[12]),median:num(r[8]),weekRank:num(r[10]),consistency:num(r[11]),winStreak:num(r[14]),lossStreak:num(r[16]),medianOutcome:(r[9]||'').trim().toLowerCase(),seasonPoints:nullableNum(r[18]),seasonFinalPoints:nullableNum(r[20]),likelihood:parsePercent(r[22]),oppLikelihood:parsePercent(r[23])}));parseTeams(sr);if(page==='records'){renderRecords();document.querySelector('#status').textContent='Live records loaded';return}if(page==='managers'){setupManagerPage();document.querySelector('#status').textContent='Live manager history loaded';return}if(page==='research'){setupResearchPage();document.querySelector('#status').textContent='Live research data loaded';return}if(page==='dynasty'){setupDynastyPage();document.querySelector('#status').textContent='Live dynasty data loaded';return}if(page==='power-rankings'){setupPowerRankingsPage();document.querySelector('#status').textContent='Live power rankings loaded';return}if(page==='schedule-comparison'){setupScheduleComparisonPage();document.querySelector('#status').textContent='Live schedule comparison loaded';return}const hr=csv(texts[2]);renderLeague(sr);parseChampions(hr);renderChampion();renderShrine();setupSelectors();document.querySelector('#status').textContent='Live data loaded'}catch(e){const status=document.querySelector('#status');if(status)status.textContent='Could not load live data';console.error(e)}}
 function renderLeague(r){const at=(row,col)=>r[row-1]?.[col-1]?.trim()||'';document.querySelector('#leagueName').textContent=at(5,7)||'Rumble of Regards NFL';const size=at(17,7),info=at(8,7);document.querySelector('#leagueMeta').textContent=[size?`${parseInt(size)} Team`:'',info].filter(Boolean).join(' • ')}
 function parseTeams(r){teams=[];for(let i=4;i<r.length;i++){const row=r[i]||[],year=String(row[0]||'').replace(/\.0$/,'').trim(),owner=String(row[1]||'').trim(),team=String(row[2]||'').trim(),logo=String(row[4]||'').trim();if(/^\d{4}$/.test(year)&&owner&&team)teams.push({year,owner,team,logo:logo||FALLBACK_LOGO})}}
 function teamInfo(year,owner,fallbackTeam=''){return teams.find(t=>t.year===String(year)&&t.owner===owner)||{year:String(year),owner,team:fallbackTeam||owner,logo:FALLBACK_LOGO}}
@@ -187,6 +187,55 @@ function renderPowerRankings(){
   document.querySelector('#powerTitle').textContent=`${y} Through Week ${through}`;
   document.querySelector('#powerRange').textContent=`${y} • Weeks 1–${through}`;
   document.querySelector('#powerRankings').innerHTML=rows.map((x,i)=>`<tr><td><strong>#${i+1}</strong></td><td>${identityHTML(y,x.owner,x.team,'stand-logo')}</td><td class="power-score"><strong>${fmt(x.power)}</strong></td><td>${x.wins}-${x.losses}</td><td>${(x.winPct*100).toFixed(1)}%</td><td>${x.medianWins}-${x.medianLosses}</td><td>${(x.medianWinPct*100).toFixed(1)}%</td><td>${fmt(x.pf)}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No regular-season games through this week.</td></tr>';
+}
+
+
+function setupScheduleComparisonPage(){
+  const ys=document.querySelector('#scheduleYear'),ws=document.querySelector('#scheduleWeek'),ms=document.querySelector('#scheduleManager');
+  const years=[...new Set(ledger.filter(x=>/^\d+$/.test(x.week)).map(x=>x.year))].sort((a,b)=>+b-+a);
+  ys.innerHTML=years.map(y=>`<option>${y}</option>`).join('');
+  const savedYear=localStorage.getItem('ror-schedule-year');ys.value=years.includes(savedYear)?savedYear:years[0];
+  function fillForYear(){
+    const games=ledger.filter(x=>x.year===ys.value&&/^\d+$/.test(x.week));
+    const weeks=[...new Set(games.map(x=>+x.week))].sort((a,b)=>a-b);
+    ws.innerHTML=weeks.map(w=>`<option value="${w}">${w}</option>`).join('');
+    const savedWeek=localStorage.getItem(`ror-schedule-week-${ys.value}`);ws.value=weeks.map(String).includes(savedWeek)?savedWeek:String(weeks.at(-1)||1);
+    const owners=[...new Set(games.map(x=>x.owner))].sort((a,b)=>a.localeCompare(b));
+    ms.innerHTML=owners.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('');
+    const savedManager=localStorage.getItem(`ror-schedule-manager-${ys.value}`);ms.value=owners.includes(savedManager)?savedManager:owners[0];
+    renderScheduleComparison();
+  }
+  ys.onchange=()=>{localStorage.setItem('ror-schedule-year',ys.value);fillForYear()};
+  ws.onchange=()=>{localStorage.setItem(`ror-schedule-week-${ys.value}`,ws.value);renderScheduleComparison()};
+  ms.onchange=()=>{localStorage.setItem(`ror-schedule-manager-${ys.value}`,ms.value);renderScheduleComparison()};
+  fillForYear();
+}
+function renderScheduleComparison(){
+  const y=document.querySelector('#scheduleYear').value,through=+document.querySelector('#scheduleWeek').value,selected=document.querySelector('#scheduleManager').value;
+  const games=ledger.filter(x=>x.year===y&&/^\d+$/.test(x.week)&&+x.week<=through);
+  const selectedGames=games.filter(x=>x.owner===selected),scoreByWeek=new Map(selectedGames.map(x=>[+x.week,x.score]));
+  const actualWins=selectedGames.filter(x=>x.outcome==='w').length;
+  const scheduleOwners=[...new Set(games.map(x=>x.owner))];
+  const rows=scheduleOwners.map(owner=>{
+    const schedule=games.filter(x=>x.owner===owner&&scoreByWeek.has(+x.week));let wins=0,losses=0,ties=0;
+    for(const g of schedule){
+      const selectedScore=scoreByWeek.get(+g.week);
+      const opponentScore=g.opponent===selected?g.score:g.oppScore;
+      if(selectedScore>opponentScore)wins++;else if(selectedScore<opponentScore)losses++;else ties++;
+    }
+    const latest=[...games].filter(x=>x.owner===owner).sort((a,b)=>+b.week-+a.week)[0];
+    return{owner,team:latest?.team||owner,wins,losses,ties,diff:wins-actualWins,isOwn:owner===selected};
+  }).sort((a,b)=>b.wins-a.wins||a.losses-b.losses||a.owner.localeCompare(b.owner));
+  const selectedLatest=[...selectedGames].sort((a,b)=>+b.week-+a.week)[0];
+  const selectedTeam=selectedLatest?.team||selected;
+  document.querySelector('#scheduleTitle').textContent=`${selectedTeam} Through Week ${through}`;
+  document.querySelector('#scheduleRange').textContent=`${y} • Weeks 1–${through} • ${selected}`;
+  document.querySelector('#scheduleResults').innerHTML=rows.map(x=>{
+    const record=x.ties?`${x.wins}-${x.losses}-${x.ties}`:`${x.wins}-${x.losses}`;
+    const diff=x.isOwn?'—':`${x.diff>0?'+':''}${x.diff}`;
+    const cls=x.isOwn?'schedule-own':x.diff>0?'schedule-positive':x.diff<0?'schedule-negative':'';
+    return `<tr class="${cls}"><td>${identityHTML(y,x.owner,x.team,'stand-logo')}</td><td><strong>${record}</strong></td><td class="schedule-diff"><strong>${diff}</strong></td></tr>`;
+  }).join('')||'<tr><td colspan="3" class="muted">No regular-season games through this week.</td></tr>';
 }
 
 load();
