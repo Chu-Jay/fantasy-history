@@ -1,12 +1,13 @@
-const URLS={ledger:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQRdfwYE5J9C4n7NSaU_2HT0E7zrdSZoHZOultcBjsroqoGPE1sdoTjarHDUcpctSJOMzt9fTJjokxG/pub?gid=2024407837&single=true&output=csv',settings:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQRdfwYE5J9C4n7NSaU_2HT0E7zrdSZoHZOultcBjsroqoGPE1sdoTjarHDUcpctSJOMzt9fTJjokxG/pub?gid=130130682&single=true&output=csv',home:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQRdfwYE5J9C4n7NSaU_2HT0E7zrdSZoHZOultcBjsroqoGPE1sdoTjarHDUcpctSJOMzt9fTJjokxG/pub?gid=2092058691&single=true&output=csv'};
+const URLS={ledger:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHXrlutk_HgerfirsdUdHee4iSlWc9iG8PuyQx7CvtLcKI5knCtkG09WXN5C--NkTXt9Rr7ULzX_2f/pub?gid=1562226911&single=true&output=csv',settings:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHXrlutk_HgerfirsdUdHee4iSlWc9iG8PuyQx7CvtLcKI5knCtkG09WXN5C--NkTXt9Rr7ULzX_2f/pub?gid=2117014766&single=true&output=csv',home:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHXrlutk_HgerfirsdUdHee4iSlWc9iG8PuyQx7CvtLcKI5knCtkG09WXN5C--NkTXt9Rr7ULzX_2f/pub?gid=847843630&single=true&output=csv',schedule:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHXrlutk_HgerfirsdUdHee4iSlWc9iG8PuyQx7CvtLcKI5knCtkG09WXN5C--NkTXt9Rr7ULzX_2f/pub?gid=203232805&single=true&output=csv'};
 function csv(text){const rows=[];let row=[],cell='',q=false;for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];if(c==='"'){if(q&&n==='"'){cell+='"';i++}else q=!q}else if(c===','&&!q){row.push(cell);cell=''}else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&n==='\n')i++;row.push(cell);rows.push(row);row=[];cell=''}else cell+=c}if(cell||row.length){row.push(cell);rows.push(row)}return rows}
 const num=v=>{const n=parseFloat(String(v).replace(/[$,%]/g,''));return Number.isFinite(n)?n:0},nullableNum=v=>{const raw=String(v??'').trim();if(!raw)return null;const n=parseFloat(raw.replace(/[$,%]/g,''));return Number.isFinite(n)?n:null},parsePercent=v=>{const raw=String(v??'').trim();if(!raw)return null;const n=num(raw);return raw.includes('%')||Math.abs(n)>1?n/100:n},fmt=n=>Number(n).toFixed(2),pct=n=>Number(n).toFixed(3).replace(/^0/,''),displayWeek=w=>/^\d+$/.test(String(w))?`Week ${w}`:String(w),weekOrder=w=>/^\d+$/.test(w)?+w:({'P Wild Card':15,'P Semis':16,'P Finals':17}[w]??99),esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+let scheduleData=[];
 let ledger=[],teams=[],champions=[];
 const ROOT=document.body.dataset.root||'';
 const FALLBACK_LOGO=ROOT+'league-logo.png';
 function assetPath(src){src=String(src||'').trim();if(!src)return FALLBACK_LOGO;if(/^(?:https?:)?\/\//i.test(src)||src.startsWith('data:')||src.startsWith('/'))return src;return ROOT+src.replace(/^\.\//,'')}
 function setupNav(){const b=document.querySelector('#navToggle'),s=document.querySelector('#sidebar');if(b&&s){b.addEventListener('click',()=>s.classList.toggle('open'));document.addEventListener('click',e=>{if(innerWidth<=850&&s.classList.contains('open')&&!s.contains(e.target)&&e.target!==b)s.classList.remove('open')})}}
-async function load(){setupNav();try{const page=document.body.dataset.page||'home';const needed=(page==='records'||page==='managers'||page==='research'||page==='dynasty'||page==='power-rankings'||page==='schedule-comparison')?[URLS.ledger,URLS.settings]:[URLS.ledger,URLS.settings,URLS.home];const texts=await Promise.all(needed.map(u=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.text()})));const lr=csv(texts[0]),sr=csv(texts[1]);ledger=lr.slice(1).filter(r=>r[0]&&r[3]&&r[4]).map(r=>({owner:r[0].trim(),score:num(r[1]),opponent:r[2].trim(),year:String(r[3]).replace(/\.0$/,''),week:r[4].trim(),team:(r[5]||r[0]).trim(),oppScore:num(r[6]),outcome:(r[7]||'').trim().toLowerCase(),diff:num(r[12]),median:num(r[8]),weekRank:num(r[10]),consistency:num(r[11]),winStreak:num(r[14]),lossStreak:num(r[16]),medianOutcome:(r[9]||'').trim().toLowerCase(),seasonPoints:nullableNum(r[18]),seasonFinalPoints:nullableNum(r[20]),likelihood:parsePercent(r[22]),oppLikelihood:parsePercent(r[23])}));parseTeams(sr);if(page==='records'){renderRecords();document.querySelector('#status').textContent='Live records loaded';return}if(page==='managers'){setupManagerPage();document.querySelector('#status').textContent='Live manager history loaded';return}if(page==='research'){setupResearchPage();document.querySelector('#status').textContent='Live research data loaded';return}if(page==='dynasty'){setupDynastyPage();document.querySelector('#status').textContent='Live dynasty data loaded';return}if(page==='power-rankings'){setupPowerRankingsPage();document.querySelector('#status').textContent='Live power rankings loaded';return}if(page==='schedule-comparison'){setupScheduleComparisonPage();document.querySelector('#status').textContent='Live schedule comparison loaded';return}const hr=csv(texts[2]);renderLeague(sr);parseChampions(hr);renderChampion();renderShrine();setupSelectors();document.querySelector('#status').textContent='Live data loaded'}catch(e){const status=document.querySelector('#status');if(status)status.textContent='Could not load live data';console.error(e)}}
+async function load(){setupNav();try{const page=document.body.dataset.page||'home';const analysisPage=(page==='records'||page==='managers'||page==='research'||page==='dynasty'||page==='power-rankings'||page==='schedule-comparison'||page==='playoff-machine');const needed=analysisPage?[URLS.ledger,URLS.settings]:[URLS.ledger,URLS.settings,URLS.home];if(page==='playoff-machine')needed.push(URLS.schedule);const texts=await Promise.all(needed.map(u=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.text()})));const lr=csv(texts[0]),sr=csv(texts[1]);ledger=lr.slice(1).filter(r=>r[0]&&r[3]&&r[4]).map(r=>({owner:r[0].trim(),score:num(r[1]),opponent:r[2].trim(),year:String(r[3]).replace(/\.0$/,''),week:r[4].trim(),team:(r[5]||r[0]).trim(),oppScore:num(r[6]),outcome:(r[7]||'').trim().toLowerCase(),diff:num(r[12]),median:num(r[8]),weekRank:num(r[10]),consistency:num(r[11]),winStreak:num(r[14]),lossStreak:num(r[16]),medianOutcome:(r[9]||'').trim().toLowerCase(),seasonPoints:nullableNum(r[18]),seasonFinalPoints:nullableNum(r[20]),likelihood:parsePercent(r[22]),oppLikelihood:parsePercent(r[23])}));parseTeams(sr);if(page==='playoff-machine'){const sched=csv(texts[2]);scheduleData=sched.slice(1).filter(r=>r[0]&&r[1]&&r[2]&&r[3]).map(r=>({year:String(r[0]).replace(/\.0$/,''),week:+r[1],a:r[2].trim(),b:r[3].trim()}));}if(page==='records'){renderRecords();document.querySelector('#status').textContent='Live records loaded';return}if(page==='managers'){setupManagerPage();document.querySelector('#status').textContent='Live manager history loaded';return}if(page==='research'){setupResearchPage();document.querySelector('#status').textContent='Live research data loaded';return}if(page==='dynasty'){setupDynastyPage();document.querySelector('#status').textContent='Live dynasty data loaded';return}if(page==='power-rankings'){setupPowerRankingsPage();document.querySelector('#status').textContent='Live power rankings loaded';return}if(page==='schedule-comparison'){setupScheduleComparisonPage();document.querySelector('#status').textContent='Live schedule comparison loaded';return}if(page==='playoff-machine'){setupPlayoffMachinePage();document.querySelector('#status').textContent='Live playoff machine loaded';return}const hr=csv(texts[2]);renderLeague(sr);parseChampions(hr);renderChampion();renderShrine();setupSelectors();document.querySelector('#status').textContent='Live data loaded'}catch(e){const status=document.querySelector('#status');if(status)status.textContent='Could not load live data';console.error(e)}}
 function renderLeague(r){const at=(row,col)=>r[row-1]?.[col-1]?.trim()||'';document.querySelector('#leagueName').textContent=at(5,7)||'Rumble of Regards NFL';const size=at(17,7),info=at(8,7);document.querySelector('#leagueMeta').textContent=[size?`${parseInt(size)} Team`:'',info].filter(Boolean).join(' • ')}
 function parseTeams(r){teams=[];for(let i=4;i<r.length;i++){const row=r[i]||[],year=String(row[0]||'').replace(/\.0$/,'').trim(),owner=String(row[1]||'').trim(),team=String(row[2]||'').trim(),logo=String(row[4]||'').trim();if(/^\d{4}$/.test(year)&&owner&&team)teams.push({year,owner,team,logo:logo||FALLBACK_LOGO})}}
 function teamInfo(year,owner,fallbackTeam=''){return teams.find(t=>t.year===String(year)&&t.owner===owner)||{year:String(year),owner,team:fallbackTeam||owner,logo:FALLBACK_LOGO}}
@@ -160,7 +161,7 @@ function renderDynasty(){const latestYear=[...new Set(ledger.map(x=>x.year))].so
 
 function setupPowerRankingsPage(){
   const ys=document.querySelector('#powerYear'),ws=document.querySelector('#powerWeek');
-  const years=[...new Set(ledger.filter(x=>/^\d+$/.test(x.week)).map(x=>x.year))].sort((a,b)=>+b-+a);
+  const years=[...new Set((scheduleData.length?scheduleData.map(x=>x.year):ledger.filter(x=>/^\d+$/.test(x.week)).map(x=>x.year)))].sort((a,b)=>+b-+a);
   ys.innerHTML=years.map(y=>`<option>${y}</option>`).join('');
   const savedYear=localStorage.getItem('ror-power-year');ys.value=years.includes(savedYear)?savedYear:years[0];
   function fillWeeks(){
@@ -192,7 +193,7 @@ function renderPowerRankings(){
 
 function setupScheduleComparisonPage(){
   const ys=document.querySelector('#scheduleYear'),ws=document.querySelector('#scheduleWeek'),ms=document.querySelector('#scheduleManager');
-  const years=[...new Set(ledger.filter(x=>/^\d+$/.test(x.week)).map(x=>x.year))].sort((a,b)=>+b-+a);
+  const years=[...new Set((scheduleData.length?scheduleData.map(x=>x.year):ledger.filter(x=>/^\d+$/.test(x.week)).map(x=>x.year)))].sort((a,b)=>+b-+a);
   ys.innerHTML=years.map(y=>`<option>${y}</option>`).join('');
   const savedYear=localStorage.getItem('ror-schedule-year');ys.value=years.includes(savedYear)?savedYear:years[0];
   function fillForYear(){
@@ -236,6 +237,85 @@ function renderScheduleComparison(){
     const cls=x.isOwn?'schedule-own':x.diff>0?'schedule-positive':x.diff<0?'schedule-negative':'';
     return `<tr class="${cls}"><td>${identityHTML(y,x.owner,x.team,'stand-logo')}</td><td><strong>${record}</strong></td><td class="schedule-diff"><strong>${diff}</strong></td></tr>`;
   }).join('')||'<tr><td colspan="3" class="muted">No regular-season games through this week.</td></tr>';
+}
+
+
+// v3.0 Playoff Machine
+let playoffPicks=new Map();
+function playoffKey(year,week,a,b){return `${year}|${week}|${[a,b].sort().join('|')}`}
+function regularGamePairs(year){
+  const y=String(year), completed=new Map(), seen=new Set();
+  for(const x of ledger.filter(g=>g.year===y&&/^\d+$/.test(g.week))){
+    const k=playoffKey(y,+x.week,x.owner,x.opponent);if(seen.has(k))continue;seen.add(k);
+    completed.set(k,{key:k,week:+x.week,a:x.owner,b:x.opponent,aTeam:x.team,bTeam:teamInfo(y,x.opponent,x.opponent).team,aScore:x.score,bScore:x.oppScore,played:true});
+  }
+  const out=[];
+  for(const g of scheduleData.filter(x=>x.year===y)){
+    const k=playoffKey(y,g.week,g.a,g.b), done=completed.get(k);
+    out.push(done||{key:k,week:g.week,a:g.a,b:g.b,aTeam:teamInfo(y,g.a,g.a).team,bTeam:teamInfo(y,g.b,g.b).team,aScore:null,bScore:null,played:false});
+  }
+  if(!out.length)out.push(...completed.values());
+  return out.sort((a,b)=>a.week-b.week||a.a.localeCompare(b.a));
+}
+function setupPlayoffMachinePage(){
+  const ys=document.querySelector('#playoffYear'),ws=document.querySelector('#playoffWeek');
+  const years=[...new Set((scheduleData.length?scheduleData.map(x=>x.year):ledger.filter(x=>/^\d+$/.test(x.week)).map(x=>x.year)))].sort((a,b)=>+b-+a);
+  ys.innerHTML=years.map(y=>`<option>${y}</option>`).join('');
+  const sy=localStorage.getItem('ror-playoff-year');ys.value=years.includes(sy)?sy:years[0];
+  function fillWeeks(){
+    const weeks=[...new Set(ledger.filter(x=>x.year===ys.value&&/^\d+$/.test(x.week)).map(x=>+x.week))].sort((a,b)=>a-b);
+    ws.innerHTML=weeks.map(w=>`<option value="${w}">${w}</option>`).join('');
+    const sw=localStorage.getItem(`ror-playoff-week-${ys.value}`);ws.value=weeks.map(String).includes(sw)?sw:String(weeks[0]||1);
+    playoffPicks=new Map();renderPlayoffMachine();
+  }
+  ys.onchange=()=>{localStorage.setItem('ror-playoff-year',ys.value);fillWeeks()};
+  ws.onchange=()=>{localStorage.setItem(`ror-playoff-week-${ys.value}`,ws.value);playoffPicks=new Map();renderPlayoffMachine()};
+  document.querySelector('#playoffReset').onclick=()=>{playoffPicks=new Map();renderPlayoffMachine()};
+  fillWeeks();
+}
+function simulatedStandings(year,through,pairs){
+  const owners=[...new Set(ledger.filter(x=>x.year===String(year)&&/^\d+$/.test(x.week)).map(x=>x.owner))];
+  const map=new Map(owners.map(owner=>[owner,{owner,team:teamInfo(year,owner,owner).team,w:0,l:0,pf:0,pa:0}]));
+  const h2h=[];
+  for(const g of pairs){
+    if(g.week<=through){
+      const a=map.get(g.a),b=map.get(g.b);a.pf+=g.aScore;a.pa+=g.bScore;b.pf+=g.bScore;b.pa+=g.aScore;
+      if(g.aScore>g.bScore){a.w++;b.l++;h2h.push({a:g.a,b:g.b,winner:g.a})}else if(g.bScore>g.aScore){b.w++;a.l++;h2h.push({a:g.a,b:g.b,winner:g.b})}
+    }else{
+      const pick=playoffPicks.get(g.key);if(!pick)continue;
+      const a=map.get(g.a),b=map.get(g.b);if(pick===g.a){a.w++;b.l++}else{b.w++;a.l++}h2h.push({a:g.a,b:g.b,winner:pick});
+    }
+  }
+  function seedTie(group){
+    const rem=[...group],seeded=[];
+    while(rem.length){
+      if(rem.length===1){seeded.push(rem[0]);break}
+      const set=new Set(rem.map(t=>t.owner)),rec=new Map(rem.map(t=>[t.owner,{w:0,l:0,g:0}]));
+      for(const g of h2h){if(!set.has(g.a)||!set.has(g.b))continue;rec.get(g.a).g++;rec.get(g.b).g++;if(g.winner===g.a){rec.get(g.a).w++;rec.get(g.b).l++}else{rec.get(g.b).w++;rec.get(g.a).l++}}
+      const counts=[...rec.values()].map(r=>r.g),valid=counts[0]>0&&counts.every(n=>n===counts[0]);
+      let winner;
+      if(valid)winner=[...rem].sort((a,b)=>{const ra=rec.get(a.owner),rb=rec.get(b.owner),pa=ra.w/(ra.w+ra.l||1),pb=rb.w/(rb.w+rb.l||1);return pb-pa||b.pf-a.pf||a.pa-b.pa||a.owner.localeCompare(b.owner)})[0];
+      else winner=[...rem].sort((a,b)=>b.pf-a.pf||a.pa-b.pa||a.owner.localeCompare(b.owner))[0];
+      seeded.push(winner);rem.splice(rem.findIndex(t=>t.owner===winner.owner),1);
+    }
+    return seeded;
+  }
+  const raw=[...map.values()].sort((a,b)=>b.w-a.w||a.l-b.l),out=[];
+  for(let i=0;i<raw.length;){let j=i+1;while(j<raw.length&&raw[j].w===raw[i].w&&raw[j].l===raw[i].l)j++;out.push(...seedTie(raw.slice(i,j)));i=j}
+  return out;
+}
+function renderPlayoffMachine(){
+  const y=document.querySelector('#playoffYear').value,through=+document.querySelector('#playoffWeek').value,pairs=regularGamePairs(y),maxWeek=Math.max(0,...pairs.map(g=>g.week));
+  const remaining=pairs.filter(g=>g.week>through),knownWeeks=[...new Set(remaining.map(g=>g.week))];
+  document.querySelector('#playoffRange').textContent=`${y} • Results through Week ${through}`;
+  const future=document.querySelector('#playoffGames');
+  future.innerHTML=knownWeeks.map(w=>`<section class="playoff-week"><h3>Week ${w}</h3><div class="playoff-game-list">${remaining.filter(g=>g.week===w).map(g=>{
+    const pick=playoffPicks.get(g.key)||'';
+    return `<div class="playoff-game"><button class="playoff-pick ${pick===g.a?'selected':''}" data-key="${esc(g.key)}" data-pick="${esc(g.a)}">${identityHTML(y,g.a,g.aTeam,'stand-logo')}</button><span>vs</span><button class="playoff-pick ${pick===g.b?'selected':''}" data-key="${esc(g.key)}" data-pick="${esc(g.b)}">${identityHTML(y,g.b,g.bTeam,'stand-logo')}</button></div>`}).join('')}</div></section>`).join('')||`<p class="muted">No remaining regular-season matchups after Week ${through}.</p>`;
+  future.querySelectorAll('.playoff-pick').forEach(b=>b.onclick=()=>{playoffPicks.set(b.dataset.key,b.dataset.pick);renderPlayoffMachine()});
+  const standings=simulatedStandings(y,through,pairs),picked=remaining.filter(g=>playoffPicks.has(g.key)).length;
+  document.querySelector('#playoffStandings').innerHTML=standings.map((t,i)=>`<tr class="${i<6?'playoff-in':''}"><td><strong>#${i+1}</strong></td><td>${identityHTML(y,t.owner,t.team,'stand-logo')}</td><td><strong>${t.w}-${t.l}</strong></td><td>${fmt(t.pf)}</td><td>${fmt(t.pa)}</td><td>${i<2?'Bye':i<6?'Playoffs':'Out'}</td></tr>`).join('');
+  document.querySelector('#playoffProgress').textContent=remaining.length?`${picked} of ${remaining.length} remaining games selected`:'No remaining games available.';
 }
 
 load();
