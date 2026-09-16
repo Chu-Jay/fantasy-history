@@ -283,10 +283,23 @@ function actualSeasonStats(year,pairs){
 function recordPct(r){const n=r.w+r.l+r.t;return n?(r.w+.5*r.t)/n:0}
 function quickPickPlayoffs(mode){
   const y=currentPlayoffYear(),pairs=regularGamePairs(y),stats=actualSeasonStats(y,pairs);
-  for(const g of pairs.filter(x=>!x.played)){
-    if(mode==='random'){playoffPicks.set(g.key,Math.random()<.5?g.a:g.b);continue}
-    const a=stats.get(g.a),b=stats.get(g.b),av=mode==='pf'?a.pf:recordPct(a),bv=mode==='pf'?b.pf:recordPct(b);
-    playoffPicks.set(g.key,av===bv?PLAYOFF_TIE:(av>bv?g.a:g.b));
+  const future=pairs.filter(x=>!x.played).sort((a,b)=>a.week-b.week||a.a.localeCompare(b.a));
+  playoffPicks=new Map();
+  for(const g of future){
+    const a=stats.get(g.a),b=stats.get(g.b);
+    let pick;
+    if(mode==='random')pick=Math.random()<.5?g.a:g.b;
+    else if(mode==='pf')pick=a.pf===b.pf?PLAYOFF_TIE:(a.pf>b.pf?g.a:g.b);
+    else{
+      const av=recordPct(a),bv=recordPct(b);
+      pick=Math.abs(av-bv)<1e-12?PLAYOFF_TIE:(av>bv?g.a:g.b);
+    }
+    playoffPicks.set(g.key,pick);
+    // Winning % must evolve chronologically as each projected game is decided.
+    // A tie counts as half a win for future winning-percentage comparisons.
+    if(pick===PLAYOFF_TIE){a.t++;b.t++}
+    else if(pick===g.a){a.w++;b.l++}
+    else{b.w++;a.l++}
   }
   renderPlayoffMachine();
 }
@@ -344,7 +357,6 @@ function renderPlayoffMachine(){
   const y=currentPlayoffYear(),pairs=regularGamePairs(y),remaining=pairs.filter(g=>!g.played),knownWeeks=[...new Set(remaining.map(g=>g.week))].sort((a,b)=>a-b);
   if(playoffActiveWeek==null||!knownWeeks.includes(playoffActiveWeek))playoffActiveWeek=knownWeeks[0]??null;
   const actual=actualSeasonStats(y,pairs),completedWeeks=[...new Set(pairs.filter(g=>g.played).map(g=>g.week))],lastCompleted=completedWeeks.length?Math.max(...completedWeeks):0;
-  document.querySelector('#playoffRange').textContent=lastCompleted?`${y} season • Actual results through Week ${lastCompleted}`:`${y} season`;
   const tabs=document.querySelector('#playoffWeekTabs');
   tabs.innerHTML=knownWeeks.map(w=>`<button class="playoff-week-tab ${w===playoffActiveWeek?'active':''}" data-week="${w}">Week ${w}</button>`).join('')||'<span class="muted">Regular season complete</span>';
   tabs.querySelectorAll('button').forEach(b=>b.onclick=()=>{playoffActiveWeek=+b.dataset.week;renderPlayoffMachine()});
@@ -354,7 +366,7 @@ function renderPlayoffMachine(){
     return `<div class="playoff-game"><button class="playoff-pick ${pick===g.a?'selected':''}" data-key="${esc(g.key)}" data-pick="${esc(g.a)}">${identityHTML(y,g.a,g.aTeam,'stand-logo')}</button><button class="playoff-pick ${pick===g.b?'selected':''}" data-key="${esc(g.key)}" data-pick="${esc(g.b)}">${identityHTML(y,g.b,g.bTeam,'stand-logo')}</button>${pick===PLAYOFF_TIE?'<div class="playoff-tie-label">Projected tie</div>':''}</div>`}).join('')}</div>`:'<p class="muted">No remaining games.</p>';
   future.querySelectorAll('.playoff-pick').forEach(b=>b.onclick=()=>{playoffPicks.set(b.dataset.key,b.dataset.pick);renderPlayoffMachine()});
   const {standings,tieInfo}=simulatedStandings(y,pairs),picked=remaining.filter(g=>playoffPicks.has(g.key)).length;
-  document.querySelector('#playoffStandings').innerHTML=standings.map((t,i)=>{const rec=t.t?`${t.w}-${t.l}-${t.t}`:`${t.w}-${t.l}`;return `<tr class="${i<6?'playoff-in':''}"><td><strong>#${i+1}</strong></td><td>${identityHTML(y,t.owner,t.team,'stand-logo')} ${tiebreakInfoHTML(tieInfo.get(t.owner))}</td><td><strong>${rec}</strong></td><td>${fmt(t.pf)}</td><td>${fmt(t.pa)}</td><td>${i<2?'Bye':i<6?'Playoffs':'Out'}</td></tr>`}).join('');
+  document.querySelector('#playoffStandings').innerHTML=standings.map((t,i)=>{const rec=t.t?`${t.w}-${t.l}-${t.t}`:`${t.w}-${t.l}`;const ti=teamInfo(y,t.owner,t.team);return `<tr class="${i<6?'playoff-in':''}"><td><strong>#${i+1}</strong></td><td><div class="playoff-team-cell"><img class="stand-logo" ${logoAttrs(ti.logo)} alt=""><div class="playoff-team-copy"><span class="playoff-team-label">TEAM</span><div class="playoff-team-name"><strong>${esc(ti.team)}</strong>${tiebreakInfoHTML(tieInfo.get(t.owner))}</div><small>${esc(t.owner)}</small></div></div></td><td><strong>${rec}</strong></td><td>${fmt(t.pf)}</td><td>${fmt(t.pa)}</td><td>${i<2?'Bye':i<6?'Playoffs':'Out'}</td></tr>`}).join('');
   document.querySelector('#playoffProgress').textContent=remaining.length?`${picked} of ${remaining.length} remaining games selected`:'Regular season complete.';
 }
 
