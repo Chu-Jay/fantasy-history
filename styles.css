@@ -77,3 +77,8 @@ footer a:visited {
 footer a:hover {
   color: var(--text);
 }
+
+
+/* v2.8 Power Rankings */
+.power-shell{display:flex;flex-direction:column;gap:18px}.power-controls{text-align:center}.power-selectors{display:flex;justify-content:center;gap:18px;flex-wrap:wrap}.power-selectors label{font-size:.72rem;color:var(--accent);font-weight:900;letter-spacing:.12em}.power-selectors select{display:block;margin-top:8px;min-width:160px;background:#0d1014;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:11px 34px 11px 12px;font-size:.95rem;font-weight:800}.power-table{min-width:850px}.power-table th:first-child,.power-table td:first-child{text-align:right}.power-table .power-score{color:var(--accent);font-size:1rem}.power-formula h2{margin:0 0 12px}.power-formula p{line-height:1.55}.power-formula strong{color:var(--text)}
+@media(max-width:560px){.power-selectors{display:grid;grid-template-columns:1fr 1fr}.power-selectors select{width:100%;min-width:0}}

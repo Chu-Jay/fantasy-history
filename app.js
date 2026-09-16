@@ -6,7 +6,7 @@ const ROOT=document.body.dataset.root||'';
 const FALLBACK_LOGO=ROOT+'league-logo.png';
 function assetPath(src){src=String(src||'').trim();if(!src)return FALLBACK_LOGO;if(/^(?:https?:)?\/\//i.test(src)||src.startsWith('data:')||src.startsWith('/'))return src;return ROOT+src.replace(/^\.\//,'')}
 function setupNav(){const b=document.querySelector('#navToggle'),s=document.querySelector('#sidebar');if(b&&s){b.addEventListener('click',()=>s.classList.toggle('open'));document.addEventListener('click',e=>{if(innerWidth<=850&&s.classList.contains('open')&&!s.contains(e.target)&&e.target!==b)s.classList.remove('open')})}}
-async function load(){setupNav();try{const page=document.body.dataset.page||'home';const needed=(page==='records'||page==='managers'||page==='research'||page==='dynasty')?[URLS.ledger,URLS.settings]:[URLS.ledger,URLS.settings,URLS.home];const texts=await Promise.all(needed.map(u=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.text()})));const lr=csv(texts[0]),sr=csv(texts[1]);ledger=lr.slice(1).filter(r=>r[0]&&r[3]&&r[4]).map(r=>({owner:r[0].trim(),score:num(r[1]),opponent:r[2].trim(),year:String(r[3]).replace(/\.0$/,''),week:r[4].trim(),team:(r[5]||r[0]).trim(),oppScore:num(r[6]),outcome:(r[7]||'').trim().toLowerCase(),diff:num(r[12]),median:num(r[8]),weekRank:num(r[10]),consistency:num(r[11]),winStreak:num(r[14]),lossStreak:num(r[16]),medianOutcome:(r[9]||'').trim().toLowerCase(),seasonPoints:nullableNum(r[18]),seasonFinalPoints:nullableNum(r[20]),likelihood:parsePercent(r[22]),oppLikelihood:parsePercent(r[23])}));parseTeams(sr);if(page==='records'){renderRecords();document.querySelector('#status').textContent='Live records loaded';return}if(page==='managers'){setupManagerPage();document.querySelector('#status').textContent='Live manager history loaded';return}if(page==='research'){setupResearchPage();document.querySelector('#status').textContent='Live research data loaded';return}if(page==='dynasty'){setupDynastyPage();document.querySelector('#status').textContent='Live dynasty data loaded';return}const hr=csv(texts[2]);renderLeague(sr);parseChampions(hr);renderChampion();renderShrine();setupSelectors();document.querySelector('#status').textContent='Live data loaded'}catch(e){const status=document.querySelector('#status');if(status)status.textContent='Could not load live data';console.error(e)}}
+async function load(){setupNav();try{const page=document.body.dataset.page||'home';const needed=(page==='records'||page==='managers'||page==='research'||page==='dynasty'||page==='power-rankings')?[URLS.ledger,URLS.settings]:[URLS.ledger,URLS.settings,URLS.home];const texts=await Promise.all(needed.map(u=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.text()})));const lr=csv(texts[0]),sr=csv(texts[1]);ledger=lr.slice(1).filter(r=>r[0]&&r[3]&&r[4]).map(r=>({owner:r[0].trim(),score:num(r[1]),opponent:r[2].trim(),year:String(r[3]).replace(/\.0$/,''),week:r[4].trim(),team:(r[5]||r[0]).trim(),oppScore:num(r[6]),outcome:(r[7]||'').trim().toLowerCase(),diff:num(r[12]),median:num(r[8]),weekRank:num(r[10]),consistency:num(r[11]),winStreak:num(r[14]),lossStreak:num(r[16]),medianOutcome:(r[9]||'').trim().toLowerCase(),seasonPoints:nullableNum(r[18]),seasonFinalPoints:nullableNum(r[20]),likelihood:parsePercent(r[22]),oppLikelihood:parsePercent(r[23])}));parseTeams(sr);if(page==='records'){renderRecords();document.querySelector('#status').textContent='Live records loaded';return}if(page==='managers'){setupManagerPage();document.querySelector('#status').textContent='Live manager history loaded';return}if(page==='research'){setupResearchPage();document.querySelector('#status').textContent='Live research data loaded';return}if(page==='dynasty'){setupDynastyPage();document.querySelector('#status').textContent='Live dynasty data loaded';return}if(page==='power-rankings'){setupPowerRankingsPage();document.querySelector('#status').textContent='Live power rankings loaded';return}const hr=csv(texts[2]);renderLeague(sr);parseChampions(hr);renderChampion();renderShrine();setupSelectors();document.querySelector('#status').textContent='Live data loaded'}catch(e){const status=document.querySelector('#status');if(status)status.textContent='Could not load live data';console.error(e)}}
 function renderLeague(r){const at=(row,col)=>r[row-1]?.[col-1]?.trim()||'';document.querySelector('#leagueName').textContent=at(5,7)||'Rumble of Regards NFL';const size=at(17,7),info=at(8,7);document.querySelector('#leagueMeta').textContent=[size?`${parseInt(size)} Team`:'',info].filter(Boolean).join(' • ')}
 function parseTeams(r){teams=[];for(let i=4;i<r.length;i++){const row=r[i]||[],year=String(row[0]||'').replace(/\.0$/,'').trim(),owner=String(row[1]||'').trim(),team=String(row[2]||'').trim(),logo=String(row[4]||'').trim();if(/^\d{4}$/.test(year)&&owner&&team)teams.push({year,owner,team,logo:logo||FALLBACK_LOGO})}}
 function teamInfo(year,owner,fallbackTeam=''){return teams.find(t=>t.year===String(year)&&t.owner===owner)||{year:String(year),owner,team:fallbackTeam||owner,logo:FALLBACK_LOGO}}
@@ -156,5 +156,37 @@ function renderDynasty(){const latestYear=[...new Set(ledger.map(x=>x.year))].so
  const head=`<tr><th>${metric} Rank</th><th>Manager</th><th>Prestige</th><th>Consistency</th><th>Dynasty Grade</th><th>Total Win %</th><th>Matchup Win %</th><th>Median Win %</th><th>PPW</th><th>Season Volatility</th><th>Playoff Apps</th><th>Playoff Wins</th><th>Finals Apps</th><th>Titles</th><th>Avg Likelihood</th><th>Opp Likelihood</th><th>Luck</th></tr>`;
  document.querySelector('#dynastyTable').innerHTML=`<thead>${head}</thead><tbody>${rows.map(x=>`<tr><td><strong>#${x.rank}</strong></td><td>${identityHTML(x.year,x.owner,x.team,'stand-logo')}</td><td><strong>${fmt(x.prestige)}</strong></td><td><strong>${x.cons.toFixed(2)}</strong></td><td><strong>${x.grade}</strong></td><td>${(x.totalPct*100).toFixed(1)}%</td><td>${(x.matchupPct*100).toFixed(1)}%</td><td>${(x.medianPct*100).toFixed(1)}%</td><td>${fmt(x.ppw)}</td><td>${fmt(x.volatility)}</td><td>${x.playoffYears}</td><td>${x.playoffWins}</td><td>${x.finalApps}</td><td>${x.titles}</td><td>${(x.avgLik*100).toFixed(2)}%</td><td>${(x.avgOpp*100).toFixed(2)}%</td><td>${x.luck>=0?'+':''}${(x.luck*100).toFixed(2)}%</td></tr>`).join('')}</tbody>`;
  document.querySelector('#dynastyCount').textContent=`Comparing ${rows.length} manager${rows.length===1?'':'s'} • ${document.querySelector('#includeDefunct').checked?'All historical teams':'Current teams only'} • Sorted by ${metric}`}
+
+
+function setupPowerRankingsPage(){
+  const ys=document.querySelector('#powerYear'),ws=document.querySelector('#powerWeek');
+  const years=[...new Set(ledger.filter(x=>/^\d+$/.test(x.week)).map(x=>x.year))].sort((a,b)=>+b-+a);
+  ys.innerHTML=years.map(y=>`<option>${y}</option>`).join('');
+  const savedYear=localStorage.getItem('ror-power-year');ys.value=years.includes(savedYear)?savedYear:years[0];
+  function fillWeeks(){
+    const weeks=[...new Set(ledger.filter(x=>x.year===ys.value&&/^\d+$/.test(x.week)).map(x=>+x.week))].sort((a,b)=>a-b);
+    ws.innerHTML=weeks.map(w=>`<option value="${w}">${w}</option>`).join('');
+    const savedWeek=localStorage.getItem(`ror-power-week-${ys.value}`);ws.value=weeks.map(String).includes(savedWeek)?savedWeek:String(weeks.at(-1)||1);
+    renderPowerRankings();
+  }
+  ys.onchange=()=>{localStorage.setItem('ror-power-year',ys.value);fillWeeks()};
+  ws.onchange=()=>{localStorage.setItem(`ror-power-week-${ys.value}`,ws.value);renderPowerRankings()};
+  fillWeeks();
+}
+function renderPowerRankings(){
+  const y=document.querySelector('#powerYear').value,through=+document.querySelector('#powerWeek').value;
+  const games=ledger.filter(x=>x.year===y&&/^\d+$/.test(x.week)&&+x.week<=through),owners=[...new Set(games.map(x=>x.owner))];
+  const rows=owners.map(owner=>{
+    const g=games.filter(x=>x.owner===owner).sort((a,b)=>+a.week-+b.week),latest=g.at(-1),played=g.length;
+    const wins=g.filter(x=>x.outcome==='w').length,losses=g.filter(x=>x.outcome==='l').length;
+    const medianWins=g.filter(x=>x.medianOutcome==='w').length,medianLosses=g.filter(x=>x.medianOutcome==='l').length;
+    const pf=g.reduce((s,x)=>s+x.score,0),winPct=played?wins/played:0,medianWinPct=played?medianWins/played:0;
+    const power=(pf*2)+(pf*winPct)+(pf*medianWinPct);
+    return{owner,team:latest?.team||owner,year:y,pf,wins,losses,winPct,medianWins,medianLosses,medianWinPct,power};
+  }).sort((a,b)=>b.power-a.power||b.pf-a.pf||a.owner.localeCompare(b.owner));
+  document.querySelector('#powerTitle').textContent=`${y} Through Week ${through}`;
+  document.querySelector('#powerRange').textContent=`${y} • Weeks 1–${through}`;
+  document.querySelector('#powerRankings').innerHTML=rows.map((x,i)=>`<tr><td><strong>#${i+1}</strong></td><td>${identityHTML(y,x.owner,x.team,'stand-logo')}</td><td class="power-score"><strong>${fmt(x.power)}</strong></td><td>${x.wins}-${x.losses}</td><td>${(x.winPct*100).toFixed(1)}%</td><td>${x.medianWins}-${x.medianLosses}</td><td>${(x.medianWinPct*100).toFixed(1)}%</td><td>${fmt(x.pf)}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No regular-season games through this week.</td></tr>';
+}
 
 load();
