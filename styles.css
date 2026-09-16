@@ -129,3 +129,14 @@ footer a:hover {
 @media(max-width:1050px){.playoff-week-tabs{grid-template-columns:repeat(5,minmax(0,1fr))}}
 @media(max-width:700px){.playoff-week-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:430px){.playoff-week-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* v3.6 Playoff Odds */
+.playoff-odds-shell{display:flex;flex-direction:column;gap:18px;padding-top:28px}
+.odds-controls{display:flex;align-items:end;justify-content:space-between;gap:18px}
+.odds-controls .selector-block label{display:block;font-size:.68rem;color:var(--accent);font-weight:900;letter-spacing:.12em}
+.odds-controls select{margin-top:8px;min-width:180px;background:#0d1014;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:11px 36px 11px 13px;font-weight:800}
+.odds-method{text-align:right;display:flex;flex-direction:column;gap:3px}.odds-method strong{font-size:.9rem}.odds-method span{font-size:.72rem;color:var(--muted)}
+.odds-table{min-width:940px}.odds-table th:first-child,.odds-table td:first-child{text-align:left;min-width:220px}.odds-table th:not(:first-child),.odds-table td:not(:first-child){text-align:center;font-variant-numeric:tabular-nums}
+.odds-table .odds-bye{background:rgba(126,231,135,.08)}.odds-table .odds-out{background:rgba(255,107,107,.08)}.odds-table .odds-total{color:var(--accent);font-size:1.02rem}
+.odds-explain h2{margin:3px 0 9px}.odds-explain p:last-child{color:var(--muted);line-height:1.65;max-width:900px}
+@media(max-width:650px){.odds-controls{align-items:stretch;flex-direction:column}.odds-method{text-align:left}.odds-controls select{width:100%}}
