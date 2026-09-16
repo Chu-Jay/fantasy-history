@@ -121,3 +121,11 @@ footer a:hover {
 /* v3.4 Playoff Machine refinements */
 .playoff-machine-main{padding-top:28px}
 .playoff-team-label{display:none}
+
+/* v3.5 Playoff Machine layout refinements */
+.playoff-table th:nth-child(2),.playoff-table td:nth-child(2){text-align:left!important}
+.playoff-week-tabs{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));overflow:visible;margin:0 0 18px;padding:0;border-bottom:1px solid var(--line)}
+.playoff-week-tab{min-width:0;width:100%;padding:12px 8px}
+@media(max-width:1050px){.playoff-week-tabs{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media(max-width:700px){.playoff-week-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:430px){.playoff-week-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}}
