@@ -1,4 +1,4 @@
-const URLS={ledger:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHXrlutk_HgerfirsdUdHee4iSlWc9iG8PuyQx7CvtLcKI5knCtkG09WXN5C--NkTXt9Rr7ULzX_2f/pub?gid=1562226911&single=true&output=csv',settings:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHXrlutk_HgerfirsdUdHee4iSlWc9iG8PuyQx7CvtLcKI5knCtkG09WXN5C--NkTXt9Rr7ULzX_2f/pub?gid=2117014766&single=true&output=csv',home:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHXrlutk_HgerfirsdUdHee4iSlWc9iG8PuyQx7CvtLcKI5knCtkG09WXN5C--NkTXt9Rr7ULzX_2f/pub?gid=847843630&single=true&output=csv',schedule:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHXrlutk_HgerfirsdUdHee4iSlWc9iG8PuyQx7CvtLcKI5knCtkG09WXN5C--NkTXt9Rr7ULzX_2f/pub?gid=203232805&single=true&output=csv'};
+const URLS={ledger:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHXrlutk_HgerfirsdUdHee4iSlWc9iG8PuyQx7CvtLcKI5knCtkG09WXN5C--NkTXt9Rr7ULzX_2f/pub?gid=1562226911&single=true&output=csv',settings:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHXrlutk_HgerfirsdUdHee4iSlWc9iG8PuyQx7CvtLcKI5knCtkG09WXN5C--NkTXt9Rr7ULzX_2f/pub?gid=2117014766&single=true&output=csv',home:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHXrlutk_HgerfirsdUdHee4iSlWc9iG8PuyQx7CvtLcKI5knCtkG09WXN5C--NkTXt9Rr7ULzX_2f/pub?gid=847843630&single=true&output=csv',schedule:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHXrlutk_HgerfirsdUdHee4iSlWc9iG8PuyQx7CvtLcKI5knCtkG09WXN5C--NkTXt9Rr7ULzX_2f/pub?gid=203232805&single=true&output=csv',draftHistory:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHXrlutk_HgerfirsdUdHee4iSlWc9iG8PuyQx7CvtLcKI5knCtkG09WXN5C--NkTXt9Rr7ULzX_2f/pub?gid=388595968&single=true&output=csv',rosterSnapshots:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHXrlutk_HgerfirsdUdHee4iSlWc9iG8PuyQx7CvtLcKI5knCtkG09WXN5C--NkTXt9Rr7ULzX_2f/pub?gid=515398859&single=true&output=csv',rosterMoves:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHXrlutk_HgerfirsdUdHee4iSlWc9iG8PuyQx7CvtLcKI5knCtkG09WXN5C--NkTXt9Rr7ULzX_2f/pub?gid=435094542&single=true&output=csv'};
 function csv(text){const rows=[];let row=[],cell='',q=false;for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];if(c==='"'){if(q&&n==='"'){cell+='"';i++}else q=!q}else if(c===','&&!q){row.push(cell);cell=''}else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&n==='\n')i++;row.push(cell);rows.push(row);row=[];cell=''}else cell+=c}if(cell||row.length){row.push(cell);rows.push(row)}return rows}
 const num=v=>{const n=parseFloat(String(v).replace(/[$,%]/g,''));return Number.isFinite(n)?n:0},nullableNum=v=>{const raw=String(v??'').trim();if(!raw)return null;const n=parseFloat(raw.replace(/[$,%]/g,''));return Number.isFinite(n)?n:null},parsePercent=v=>{const raw=String(v??'').trim();if(!raw)return null;const n=num(raw);return raw.includes('%')||Math.abs(n)>1?n/100:n},fmt=n=>Number(n).toFixed(2),pct=n=>Number(n).toFixed(3).replace(/^0/,''),displayWeek=w=>/^\d+$/.test(String(w))?`Week ${w}`:String(w),weekOrder=w=>/^\d+$/.test(w)?+w:({'P Wild Card':15,'P Semis':16,'P Finals':17}[w]??99),esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 let scheduleData=[];
@@ -6,8 +6,30 @@ let ledger=[],teams=[],champions=[];
 const ROOT=document.body.dataset.root||'';
 const FALLBACK_LOGO=ROOT+'league-logo.png';
 function assetPath(src){src=String(src||'').trim();if(!src)return FALLBACK_LOGO;if(/^(?:https?:)?\/\//i.test(src)||src.startsWith('data:')||src.startsWith('/'))return src;return ROOT+src.replace(/^\.\//,'')}
-function setupNav(){const b=document.querySelector('#navToggle'),s=document.querySelector('#sidebar');if(b&&s){b.addEventListener('click',()=>s.classList.toggle('open'));document.addEventListener('click',e=>{if(innerWidth<=850&&s.classList.contains('open')&&!s.contains(e.target)&&e.target!==b)s.classList.remove('open')})}}
-async function load(){setupNav();try{const page=document.body.dataset.page||'home';const analysisPage=(page==='records'||page==='managers'||page==='research'||page==='dynasty'||page==='power-rankings'||page==='schedule-comparison'||page==='playoff-machine'||page==='playoff-odds');const needed=analysisPage?[URLS.ledger,URLS.settings]:[URLS.ledger,URLS.settings,URLS.home];if(page==='playoff-machine'||page==='playoff-odds')needed.push(URLS.schedule);const texts=await Promise.all(needed.map(u=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.text()})));const lr=csv(texts[0]),sr=csv(texts[1]);ledger=lr.slice(1).filter(r=>r[0]&&r[3]&&r[4]).map(r=>({owner:r[0].trim(),score:num(r[1]),opponent:r[2].trim(),year:String(r[3]).replace(/\.0$/,''),week:r[4].trim(),team:(r[5]||r[0]).trim(),oppScore:num(r[6]),outcome:(r[7]||'').trim().toLowerCase(),diff:num(r[12]),median:num(r[8]),weekRank:num(r[10]),consistency:num(r[11]),winStreak:num(r[14]),lossStreak:num(r[16]),medianOutcome:(r[9]||'').trim().toLowerCase(),seasonPoints:nullableNum(r[18]),seasonFinalPoints:nullableNum(r[20]),likelihood:parsePercent(r[22]),oppLikelihood:parsePercent(r[23])}));parseTeams(sr);if(page==='playoff-machine'||page==='playoff-odds'){const sched=csv(texts[2]);scheduleData=sched.slice(1).filter(r=>r[0]&&r[1]&&r[2]&&r[3]).map(r=>({year:String(r[0]).replace(/\.0$/,''),week:+r[1],a:r[2].trim(),b:r[3].trim()}));}if(page==='records'){renderRecords();document.querySelector('#status').textContent='Live records loaded';return}if(page==='managers'){setupManagerPage();document.querySelector('#status').textContent='Live manager history loaded';return}if(page==='research'){setupResearchPage();document.querySelector('#status').textContent='Live research data loaded';return}if(page==='dynasty'){setupDynastyPage();document.querySelector('#status').textContent='Live dynasty data loaded';return}if(page==='power-rankings'){setupPowerRankingsPage();document.querySelector('#status').textContent='Live power rankings loaded';return}if(page==='schedule-comparison'){setupScheduleComparisonPage();document.querySelector('#status').textContent='Live schedule comparison loaded';return}if(page==='playoff-machine'){setupPlayoffMachinePage();document.querySelector('#status').textContent='Live playoff machine loaded';return}if(page==='playoff-odds'){setupPlayoffOddsPage();return}const hr=csv(texts[2]);renderLeague(sr);parseChampions(hr);renderChampion();renderShrine();setupSelectors();document.querySelector('#status').textContent='Live data loaded'}catch(e){const status=document.querySelector('#status');if(status)status.textContent='Could not load live data';console.error(e)}}
+function setupNav(){
+  const b=document.querySelector('#navToggle'),s=document.querySelector('#sidebar');
+  if(s){
+    const nav=s.querySelector('.side-nav');
+    if(nav){
+      // Normalize Trade Recap navigation on every page: remove stale/duplicate
+      // copies, then insert exactly one link immediately after Draft Recap.
+      [...nav.querySelectorAll('a')]
+        .filter(a=>/^trade recap$/i.test(a.textContent.trim()))
+        .forEach(a=>a.remove());
+      const draft=[...nav.querySelectorAll('a')]
+        .find(a=>/^draft recap$/i.test(a.textContent.trim()));
+      if(draft){
+        const a=document.createElement('a');
+        a.href=ROOT+'trade-recap/';
+        a.textContent='Trade Recap';
+        if((document.body.dataset.page||'')==='trade-recap')a.classList.add('active');
+        draft.insertAdjacentElement('afterend',a);
+      }
+    }
+  }
+  if(b&&s){b.addEventListener('click',()=>s.classList.toggle('open'));document.addEventListener('click',e=>{if(innerWidth<=850&&s.classList.contains('open')&&!s.contains(e.target)&&e.target!==b)s.classList.remove('open')})}
+}
+async function load(){setupNav();try{const page=document.body.dataset.page||'home';if(page==='roster-history'){await loadRosterHistoryPage();return;}if(page==='draft-recap'){await loadDraftRecapPage();return;}if(page==='trade-recap'){await loadTradeRecapPage();return;}const analysisPage=(page==='records'||page==='managers'||page==='research'||page==='dynasty'||page==='power-rankings'||page==='schedule-comparison'||page==='playoff-machine'||page==='playoff-odds');const needed=analysisPage?[URLS.ledger,URLS.settings]:[URLS.ledger,URLS.settings,URLS.home];if(page==='playoff-machine'||page==='playoff-odds')needed.push(URLS.schedule);const texts=await Promise.all(needed.map(u=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.text()})));const lr=csv(texts[0]),sr=csv(texts[1]);ledger=lr.slice(1).filter(r=>r[0]&&r[3]&&r[4]).map(r=>({owner:r[0].trim(),score:num(r[1]),opponent:r[2].trim(),year:String(r[3]).replace(/\.0$/,''),week:r[4].trim(),team:(r[5]||r[0]).trim(),oppScore:num(r[6]),outcome:(r[7]||'').trim().toLowerCase(),diff:num(r[12]),median:num(r[8]),weekRank:num(r[10]),consistency:num(r[11]),winStreak:num(r[14]),lossStreak:num(r[16]),medianOutcome:(r[9]||'').trim().toLowerCase(),seasonPoints:nullableNum(r[18]),seasonFinalPoints:nullableNum(r[20]),likelihood:parsePercent(r[22]),oppLikelihood:parsePercent(r[23])}));parseTeams(sr);if(page==='playoff-machine'||page==='playoff-odds'){const sched=csv(texts[2]);scheduleData=sched.slice(1).filter(r=>r[0]&&r[1]&&r[2]&&r[3]).map(r=>({year:String(r[0]).replace(/\.0$/,''),week:+r[1],a:r[2].trim(),b:r[3].trim()}));}if(page==='records'){renderRecords();document.querySelector('#status').textContent='Live records loaded';return}if(page==='managers'){setupManagerPage();document.querySelector('#status').textContent='Live manager history loaded';return}if(page==='research'){setupResearchPage();document.querySelector('#status').textContent='Live research data loaded';return}if(page==='dynasty'){setupDynastyPage();document.querySelector('#status').textContent='Live dynasty data loaded';return}if(page==='power-rankings'){setupPowerRankingsPage();document.querySelector('#status').textContent='Live power rankings loaded';return}if(page==='schedule-comparison'){setupScheduleComparisonPage();document.querySelector('#status').textContent='Live schedule comparison loaded';return}if(page==='playoff-machine'){setupPlayoffMachinePage();document.querySelector('#status').textContent='Live playoff machine loaded';return}if(page==='playoff-odds'){setupPlayoffOddsPage();return}const hr=csv(texts[2]);renderLeague(sr);parseChampions(hr);renderChampion();renderShrine();setupSelectors();document.querySelector('#status').textContent='Live data loaded'}catch(e){const status=document.querySelector('#status');if(status)status.textContent='Could not load live data';console.error(e)}}
 function renderLeague(r){const at=(row,col)=>r[row-1]?.[col-1]?.trim()||'';document.querySelector('#leagueName').textContent=at(5,7)||'Rumble of Regards NFL';const size=at(17,7),info=at(8,7);document.querySelector('#leagueMeta').textContent=[size?`${parseInt(size)} Team`:'',info].filter(Boolean).join(' • ')}
 function parseTeams(r){teams=[];for(let i=4;i<r.length;i++){const row=r[i]||[],year=String(row[0]||'').replace(/\.0$/,'').trim(),owner=String(row[1]||'').trim(),team=String(row[2]||'').trim(),logo=String(row[4]||'').trim();if(/^\d{4}$/.test(year)&&owner&&team)teams.push({year,owner,team,logo:logo||FALLBACK_LOGO})}}
 function teamInfo(year,owner,fallbackTeam=''){return teams.find(t=>t.year===String(year)&&t.owner===owner)||{year:String(year),owner,team:fallbackTeam||owner,logo:FALLBACK_LOGO}}
@@ -449,3 +471,295 @@ function renderPlayoffOdds(){
 }
 
 load();
+
+
+// Roster History: completed weekly snapshots + cleaned lasting moves.
+let historyDraft=[],historyRosters=[],historyMoves=[];
+const HISTORY_TEAM_NAMES={1:'OsmaBinBallin',2:'Snails Eat Tomato',4:'Triangle',5:'Mug Maniacs',7:'wholesale',8:'Njggabas in Paris',9:'CMC Bunni',10:"Erik's Excellent Team"};
+function historyObjects(text){const rows=csv(text);if(!rows.length)return[];const headers=rows[0].map(h=>String(h||'').trim());return rows.slice(1).filter(r=>r.some(v=>String(v||'').trim())).map(r=>Object.fromEntries(headers.map((h,i)=>[h,String(r[i]??'').trim()]))) }
+function hval(row,...names){const norm=s=>String(s).toLowerCase().replace(/[^a-z0-9]/g,'');const wanted=names.map(norm);for(const [k,v] of Object.entries(row||{}))if(wanted.includes(norm(k)))return v;return''}
+function hyear(r){return hval(r,'Year','Season')}
+function hweek(r){return Number(hval(r,'Week','Scoring Period','ScoringPeriodId'))||0}
+function hteamId(r){return Number(hval(r,'Team ID','TeamId','Team'))||0}
+function hteamName(r){
+  const id=hteamId(r);
+  const year=hyear(r);
+  const raw=hval(r,'Team','Team Name','TeamName');
+  return raw||(year==='2026'?HISTORY_TEAM_NAMES[id]:'')||`Team ${id}`;
+}
+function historyTeamLogo(r){const year=hyear(r),name=hteamName(r);const match=teams.find(t=>t.year===year&&t.team===name);return match?.logo||FALLBACK_LOGO}
+function hplayer(r){return hval(r,'Player Name','PlayerName','Player')||`Player ${hval(r,'Player ID','PlayerId')}`}
+function hslot(r){return Number(hval(r,'Lineup Slot ID','LineupSlotId','Slot ID','SlotId'))}
+function hscore(r){const v=hval(r,'Fantasy Points','FantasyPoints','Points','Score','Week Points','WeekPoints');return v===''?null:Number(v)}
+function slotName(id){return ({0:'QB',2:'RB',4:'WR',6:'TE',16:'D/ST',17:'K',20:'BENCH',21:'IR',23:'FLEX'})[Number(id)]||`SLOT ${id}`}
+const STARTER_SLOT_ORDER={0:0,2:1,4:2,6:3,23:4,16:5,17:6};
+function historyTeamOptions(year){const ids=new Map();[...historyRosters,...historyMoves,...historyDraft].filter(r=>hyear(r)===year).forEach(r=>{const id=hteamId(r);if(id)ids.set(id,hteamName(r))});return [...ids].sort((a,b)=>a[1].localeCompare(b[1]))}
+async function loadRosterHistoryPage(){
+  const status=document.querySelector('#status');
+  try{
+    const [d,r,m]=await Promise.all([URLS.draftHistory,URLS.rosterSnapshots,URLS.rosterMoves].map(u=>fetch(u,{cache:'no-store'}).then(x=>{if(!x.ok)throw Error(x.status);return x.text()})));
+    historyDraft=historyObjects(d);historyRosters=historyObjects(r);historyMoves=historyObjects(m);
+    setupRosterHistoryControls();status.textContent='Live roster history loaded';
+  }catch(e){status.textContent='Could not load roster history';console.error(e)}
+}
+function setupRosterHistoryControls(){
+  const ys=document.querySelector('#historyYear'),ts=document.querySelector('#historyTeam'),ws=document.querySelector('#historyWeek');
+  const years=[...new Set([...historyDraft,...historyRosters,...historyMoves].map(hyear).filter(Boolean))].sort((a,b)=>+b-+a);ys.innerHTML=years.map(y=>`<option>${esc(y)}</option>`).join('');
+  function fillTeams(){const opts=historyTeamOptions(ys.value);ts.innerHTML=`<option value="all">All Teams</option>`+opts.map(([id,n])=>`<option value="${id}">${esc(n)}</option>`).join('');ts.value=opts.some(([id])=>id===5)?'5':String(opts[0]?.[0]||'all');fillWeeks()}
+  function fillWeeks(){const team=ts.value;const weeks=[...new Set(historyRosters.filter(r=>hyear(r)===ys.value&&(team==='all'||hteamId(r)===+team)).map(hweek).filter(Boolean))].sort((a,b)=>a-b);ws.innerHTML=weeks.map(w=>`<option value="${w}">Week ${w}</option>`).join('');ws.value=String(weeks.at(-1)||'');renderRosterHistory()}
+  ys.onchange=fillTeams;ts.onchange=fillWeeks;ws.onchange=renderRosterHistory;fillTeams();
+}
+function renderRosterHistory(){const all=document.querySelector('#historyTeam').value==='all';document.querySelector('#weeklyRosterCard').hidden=all;document.querySelector('#historyGrid').classList.toggle('moves-only',all);renderHistoricalRoster();renderRosterMoves()}
+function renderHistoricalRoster(){
+  const target=document.querySelector('#historicalRoster');if(!target)return;
+  const y=document.querySelector('#historyYear').value,t=document.querySelector('#historyTeam').value,w=+document.querySelector('#historyWeek').value;
+  if(t==='all'){target.innerHTML='';return}
+  const rows=historyRosters.filter(r=>hyear(r)===y&&hteamId(r)===+t&&hweek(r)===w);
+  const starters=rows.filter(r=>![20,21].includes(hslot(r))).sort((a,b)=>(STARTER_SLOT_ORDER[hslot(a)]??99)-(STARTER_SLOT_ORDER[hslot(b)]??99));
+  const bench=rows.filter(r=>hslot(r)===20),ir=rows.filter(r=>hslot(r)===21);
+  const line=r=>{const score=hscore(r);return `<div class="roster-player"><span class="roster-slot">${esc(slotName(hslot(r)))}</span><strong>${esc(hplayer(r))}</strong>${Number.isFinite(score)?`<span class="roster-score">${score.toFixed(1)}</span>`:''}</div>`};
+  target.innerHTML=rows.length?`<div class="roster-group"><h3>Starting Roster</h3>${starters.map(line).join('')}</div><div class="roster-group roster-bench"><h3>Bench</h3>${bench.map(line).join('')||'<p class="muted">None</p>'}</div>${ir.length?`<div class="roster-group"><h3>IR</h3>${ir.map(line).join('')}</div>`:''}`:'<p class="muted">No completed roster snapshot for this selection.</p>';
+}
+function isHistoryTrade(r){
+  const moveType=hval(r,'Move Type','MoveType').toUpperCase();
+  const transactionType=hval(r,'Transaction Type','Type').toUpperCase();
+  const partner=hval(r,'Trade Partner','TradePartner','Partner Team','PartnerTeam','Other Team','OtherTeam');
+  return moveType.includes('TRADE')||transactionType.includes('TRADE')||Boolean(partner);
+}
+function tradePartnerName(r){
+  const direct=hval(r,'Trade Partner','TradePartner','Partner Team','PartnerTeam','Other Team','OtherTeam');
+  if(direct)return direct;
+  const partnerId=Number(hval(r,'Trade Partner ID','TradePartnerId','Partner Team ID','PartnerTeamId'))||0;
+  if(!partnerId)return'';
+  const year=hyear(r);
+  const match=[...historyMoves,...historyRosters,...historyDraft].find(x=>hyear(x)===year&&hteamId(x)===partnerId);
+  return match?hteamName(match):(year==='2026'?HISTORY_TEAM_NAMES[partnerId]||'':'')||`Team ${partnerId}`;
+}
+function tradeGroupKey(r){
+  // Transaction ID is the primary boundary. Different ESPN transactions
+  // are always displayed as different trades, even for the same two teams.
+  const year=hyear(r);
+  const week=hweek(r);
+  const tx=hval(r,'Transaction ID','TransactionId');
+  if(tx)return`trade:${year}:week:${week}:tx:${tx}`;
+
+  // Some reconstructed historical trades have no ESPN transaction ID.
+  // Keep those bounded by season + week + team pairing so repeated trades
+  // between the same managers in different weeks never merge together.
+  const a=hteamId(r),b=Number(hval(r,'Trade Partner ID','TradePartnerId','Partner Team ID','PartnerTeamId'))||0;
+  const ids=[a,b].filter(Boolean).sort((x,y)=>x-y).join('-');
+  const names=[hteamName(r),tradePartnerName(r)].filter(Boolean).sort().join('|');
+  const notes=hval(r,'Notes');
+  return`trade:${year}:week:${week}:${ids||names}:${notes}`;
+}
+function uniqueTradeRows(rows){
+  const seen=new Set();
+  return rows.filter(r=>{
+    const key=[hteamId(r),hplayer(r),(hval(r,'Direction','Move')||'IN').toUpperCase()].join('|');
+    if(seen.has(key))return false;
+    seen.add(key);return true;
+  });
+}
+function tradeTeamBlock(teamRows,teamName){
+  const rows=uniqueTradeRows(teamRows);
+  const incoming=rows.filter(r=>(hval(r,'Direction','Move')||'IN').toUpperCase()!=='OUT');
+  const outgoing=rows.filter(r=>(hval(r,'Direction','Move')||'IN').toUpperCase()==='OUT');
+  const lines=[];
+  incoming.forEach(r=>lines.push(`<div class="trade-player"><span class="move-sign move-in">+</span><span>${esc(hplayer(r))}</span></div>`));
+  outgoing.forEach(r=>lines.push(`<div class="trade-player"><span class="move-sign move-out">−</span><span>${esc(hplayer(r))}</span></div>`));
+  return `<div class="trade-side"><strong>${esc(teamName)}</strong>${lines.join('')||'<small class="muted">No player movement listed</small>'}</div>`;
+}
+function renderTradeGroup(rows,allTeams){
+  const clean=uniqueTradeRows(rows);
+  const teamIds=[...new Set(clean.map(hteamId).filter(Boolean))];
+  const first=clean[0];
+  const firstTeam=hteamName(first),partner=tradePartnerName(first);
+  let title=partner?`Trade: ${firstTeam} ↔ ${partner}`:`Trade: ${firstTeam}`;
+  let body='';
+  if(allTeams&&teamIds.length>1){
+    const names=teamIds.map(id=>hteamName(clean.find(r=>hteamId(r)===id)));
+    title=`Trade: ${names.join(' ↔ ')}`;
+    body=teamIds.map(id=>tradeTeamBlock(clean.filter(r=>hteamId(r)===id),hteamName(clean.find(r=>hteamId(r)===id)))).join('');
+  }else{
+    const selectedId=Number(document.querySelector('#historyTeam').value)||hteamId(first);
+    const mine=clean.filter(r=>hteamId(r)===selectedId);
+    const mineName=mine.length?hteamName(mine[0]):firstTeam;
+    const other=mine.length?tradePartnerName(mine[0]):partner;
+    title=other?`Trade with ${other}`:`Trade`;
+    body=tradeTeamBlock(mine.length?mine:clean,mineName);
+  }
+  return `<div class="trade-card"><div class="trade-title">${esc(title)}</div><div class="trade-body">${body}</div></div>`;
+}
+function renderRosterMoves(){
+  const y=document.querySelector('#historyYear').value,t=document.querySelector('#historyTeam').value,w=+document.querySelector('#historyWeek').value;
+  const rows=historyMoves.filter(r=>hyear(r)===y&&(t==='all'||hteamId(r)===+t)&&hweek(r)===w);
+  const target=document.querySelector('#rosterMoves');
+  if(!rows.length){target.innerHTML='<p class="muted">No lasting roster moves for this selection in this week.</p>';return}
+
+  const tradeGroups=new Map(),normal=[];
+  rows.forEach(r=>{
+    if(isHistoryTrade(r)){
+      const key=tradeGroupKey(r);
+      if(!tradeGroups.has(key))tradeGroups.set(key,[]);
+      tradeGroups.get(key).push(r);
+    }else normal.push(r);
+  });
+
+  const tradeHTML=[...tradeGroups.values()].map(group=>renderTradeGroup(group,t==='all')).join('');
+  const normalHTML=normal.map(r=>{
+    const dir=(hval(r,'Direction','Move')||'IN').toUpperCase();
+    const type=hval(r,'Transaction Type','Type')||hval(r,'Move Type','MoveType');
+    const faab=hval(r,'FAAB','Bid');
+    const showFaab=Number(y)>=2026&&faab!=='';
+    const meta=[t==='all'?hteamName(r):'',type,showFaab?`$${faab} FAAB`:''].filter(Boolean).join(' • ');
+    return `<div class="move-row"><span class="move-sign ${dir==='OUT'?'move-out':'move-in'}">${dir==='OUT'?'−':'+'}</span><div><strong>${esc(hplayer(r))}</strong>${meta?`<small>${esc(meta)}</small>`:''}</div></div>`;
+  }).join('');
+
+  target.innerHTML=tradeHTML+normalHTML;
+}
+
+
+
+
+async function loadDraftRecapPage(){
+  const status=document.querySelector('#status');
+  try{const [draftText,settingsText]=await Promise.all([URLS.draftHistory,URLS.settings].map(u=>fetch(u,{cache:'no-store'}).then(x=>{if(!x.ok)throw Error(x.status);return x.text()})));historyDraft=historyObjects(draftText);parseTeams(csv(settingsText));setupDraftRecapControls();status.textContent='Live draft history loaded'}catch(e){status.textContent='Could not load draft history';console.error(e)}
+}
+function draftOwnerForRow(r){
+  const year=hyear(r),teamName=hteamName(r);
+  const exact=teams.find(t=>t.year===year&&t.team===teamName);
+  return exact?.owner||'';
+}
+function draftOwnersForYear(year){
+  return [...new Set(historyDraft.filter(r=>hyear(r)===year).map(draftOwnerForRow).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+}
+function draftYearsForOwner(owner){
+  return [...new Set(historyDraft.filter(r=>draftOwnerForRow(r)===owner).map(hyear).filter(Boolean))].sort((a,b)=>+b-+a);
+}
+function setupDraftRecapControls(){
+  const ys=document.querySelector('#draftYear'),os=document.querySelector('#draftOwner');
+  const allYears=[...new Set(historyDraft.map(hyear).filter(Boolean))].sort((a,b)=>+b-+a);
+  const latestYear=allYears[0]||'';
+  let year=latestYear;
+  let owner='all';
+
+  function setOwnerOptions(owners,preferred){
+    const options=['all',...owners];
+    os.innerHTML=options.map(o=>o==='all'?'<option value="all">All Owners</option>':`<option value="${esc(o)}">${esc(o)}</option>`).join('');
+    os.value=options.includes(preferred)?preferred:'all';
+  }
+  function setYearOptions(years,preferred){
+    ys.innerHTML=years.map(y=>`<option value="${esc(y)}">${esc(y)}</option>`).join('');
+    ys.value=years.includes(preferred)?preferred:(years[0]||'');
+  }
+  function ownerChanged(){
+    owner=os.value;
+    const years=owner==='all'?allYears:draftYearsForOwner(owner);
+    setYearOptions(years,ys.value);
+    year=ys.value;
+    renderDraftRecap();
+  }
+  function yearChanged(){
+    year=ys.value;
+    const owners=draftOwnersForYear(year);
+    setOwnerOptions(owners,os.value);
+    owner=os.value;
+    renderDraftRecap();
+  }
+
+  setYearOptions(allYears,year);
+  setOwnerOptions(draftOwnersForYear(ys.value),'all');
+  os.onchange=ownerChanged;
+  ys.onchange=yearChanged;
+  renderDraftRecap();
+}
+function draftPlayerLabel(r){const pos=hval(r,'Position','Pos','Player Position','PlayerPosition'),team=hval(r,'Pro Team','ProTeam','NFL Team','NFLTeam','Team Abbreviation','TeamAbbreviation','Pro Team Abbreviation','ProTeamAbbreviation');return `${hplayer(r)}${pos||team?` — ${pos||''}${team?` (${team})`:''}`:''}`}
+function renderDraftRecap(){
+  const y=document.querySelector('#draftYear').value,owner=document.querySelector('#draftOwner').value;
+  const rows=historyDraft.filter(r=>hyear(r)===y&&(owner==='all'||draftOwnerForRow(r)===owner)).sort((a,b)=>Number(hval(a,'Overall Pick','OverallPick','Pick'))-Number(hval(b,'Overall Pick','OverallPick','Pick')));
+  const teamName=owner!=='all'&&rows.length?hteamName(rows[0]):'';
+  document.querySelector('#draftTitle').textContent=owner==='all'?`${y} Draft Recap`:(teamName?`${owner} — ${teamName} — ${y} Draft`:`${owner} — ${y} Draft`);
+  document.querySelector('#draftHistory').innerHTML=rows.length?rows.map(r=>{const overall=hval(r,'Overall Pick','OverallPick','Pick'),round=hval(r,'Round'),rp=hval(r,'Round Pick','RoundPick'),rowOwner=draftOwnerForRow(r);const meta=[round?`Round ${round}`:'',rp?`Pick ${rp}`:'',owner==='all'?rowOwner:''].filter(Boolean).join(' • ');return `<div class="draft-row"><span class="draft-pick">${overall?`#${esc(overall)}`:'—'}</span><img class="draft-team-logo" ${logoAttrs(historyTeamLogo(r))} alt=""><div><strong>${esc(draftPlayerLabel(r))}</strong><small>${esc(meta)}</small></div></div>`}).join(''):'<p class="muted">No draft data for this selection.</p>';
+}
+
+
+// Trade Recap: every completed historical trade, grouped by transaction.
+async function loadTradeRecapPage(){
+  const status=document.querySelector('#status');
+  try{
+    const [movesText,settingsText]=await Promise.all([URLS.rosterMoves,URLS.settings].map(u=>fetch(u,{cache:'no-store'}).then(x=>{if(!x.ok)throw Error(x.status);return x.text()})));
+    historyMoves=historyObjects(movesText);
+    parseTeams(csv(settingsText));
+    setupTradeRecapControls();
+    status.textContent='Live trade history loaded';
+  }catch(e){
+    status.textContent='Could not load trade history';
+    console.error(e);
+  }
+}
+function setupTradeRecapControls(){
+  const ys=document.querySelector('#tradeYear');
+  const years=[...new Set(historyMoves.filter(isHistoryTrade).map(hyear).filter(Boolean))].sort((a,b)=>+b-+a);
+  ys.innerHTML=years.map(y=>`<option value="${esc(y)}">${esc(y)}</option>`).join('');
+  ys.onchange=renderTradeRecap;
+  renderTradeRecap();
+}
+function tradeRecapTeamInfo(year,id,name){
+  const exact=teams.find(t=>t.year===String(year)&&t.team===name);
+  if(exact)return exact;
+  const row=historyMoves.find(r=>hyear(r)===String(year)&&hteamId(r)===Number(id));
+  const resolved=row?hteamName(row):name||`Team ${id}`;
+  return teams.find(t=>t.year===String(year)&&t.team===resolved)||{team:resolved,owner:'',logo:FALLBACK_LOGO};
+}
+function tradeRecapSide(rows,teamId,year,fallbackName,partnerId){
+  const ownRows=uniqueTradeRows(rows.filter(r=>hteamId(r)===Number(teamId)));
+  const partnerRows=uniqueTradeRows(rows.filter(r=>hteamId(r)===Number(partnerId)));
+  const name=ownRows.length?hteamName(ownRows[0]):fallbackName||`Team ${teamId}`;
+  const info=tradeRecapTeamInfo(year,teamId,name);
+
+  // Build this side from every asset in the transaction. If one reciprocal
+  // row is absent, infer it from the partner's row instead of dropping it.
+  const assets=new Map();
+  ownRows.forEach(r=>{
+    const player=hplayer(r),dir=(hval(r,'Direction','Move')||'IN').toUpperCase();
+    if(player)assets.set(player,dir);
+  });
+  partnerRows.forEach(r=>{
+    const player=hplayer(r);
+    if(!player||assets.has(player))return;
+    const partnerDir=(hval(r,'Direction','Move')||'IN').toUpperCase();
+    assets.set(player,partnerDir==='OUT'?'IN':'OUT');
+  });
+
+  const incoming=[...assets].filter(([,dir])=>dir!=='OUT').map(([player])=>player);
+  const outgoing=[...assets].filter(([,dir])=>dir==='OUT').map(([player])=>player);
+  const players=[
+    ...incoming.map(player=>`<div class="trade-recap-player"><span class="move-sign move-in">+</span><span>${esc(player)}</span></div>`),
+    ...outgoing.map(player=>`<div class="trade-recap-player"><span class="move-sign move-out">−</span><span>${esc(player)}</span></div>`)
+  ].join('')||'<p class="muted">No player movement listed.</p>';
+  return `<div class="trade-recap-side"><div class="trade-recap-team"><img ${logoAttrs(info.logo)} alt=""><div><strong>${esc(info.team||name)}</strong>${info.owner?`<small>${esc(info.owner)}</small>`:''}</div></div><div class="trade-recap-players">${players}</div></div>`;
+}
+function renderTradeRecap(){
+  const target=document.querySelector('#tradeRecapList');
+  const title=document.querySelector('#tradeRecapTitle');
+  const y=document.querySelector('#tradeYear').value;
+  if(!y){title.textContent='Trade Recap';target.innerHTML='<p class="muted">No trade history available.</p>';return}
+  const rows=historyMoves.filter(r=>hyear(r)===y&&isHistoryTrade(r));
+  const groups=new Map();
+  rows.forEach(r=>{const key=tradeGroupKey(r);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r)});
+  const trades=[...groups.values()].sort((a,b)=>hweek(a[0])-hweek(b[0]));
+  title.textContent=`${y} Trades`;
+  target.innerHTML=trades.length?trades.map(group=>{
+    const clean=uniqueTradeRows(group),first=clean[0],week=hweek(first);
+    const ids=[...new Set(clean.map(hteamId).filter(Boolean))];
+    const firstId=ids[0]||hteamId(first);
+    let partnerId=Number(hval(first,'Trade Partner ID','TradePartnerId','Partner Team ID','PartnerTeamId'))||0;
+    let partnerName=tradePartnerName(first);
+    if(ids.length>1)partnerId=ids.find(id=>id!==firstId)||partnerId;
+    if(!partnerName&&partnerId){const pr=historyMoves.find(r=>hyear(r)===y&&hteamId(r)===partnerId);partnerName=pr?hteamName(pr):`Team ${partnerId}`}
+    const firstName=hteamName(first);
+    const left=tradeRecapSide(clean,firstId,y,firstName,partnerId);
+    const right=partnerId?tradeRecapSide(clean,partnerId,y,partnerName,firstId):`<div class="trade-recap-side"><div class="trade-recap-team"><img ${logoAttrs(FALLBACK_LOGO)} alt=""><div><strong>${esc(partnerName||'Trade Partner')}</strong></div></div></div>`;
+    return `<article class="trade-recap-card"><div class="trade-recap-week">Week ${week}</div><div class="trade-recap-sides">${left}<div class="trade-recap-arrow">↔</div>${right}</div></article>`;
+  }).join(''):'<p class="muted">No trades recorded for this season.</p>';
+}
