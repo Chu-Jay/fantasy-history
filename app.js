@@ -264,7 +264,20 @@ function renderScheduleComparison(){
 
 // v3.2 Playoff Machine
 let playoffPicks=new Map();
+let playoffScores=new Map(); // Optional scores, keyed by matchup and owner
 let playoffActiveWeek=null;
+function playoffScoreKey(gameKey,owner){return JSON.stringify([gameKey,owner])}
+function playoffScoreInput(game,owner){
+  const value=playoffScores.get(playoffScoreKey(game.key,owner));
+  return `<input class="playoff-score-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Points" aria-label="Projected points for ${esc(owner)} in week ${game.week}" data-key="${esc(game.key)}" data-owner="${esc(owner)}" value="${value===undefined?'':esc(value)}">`;
+}
+function setupPlayoffScoreStyles(){
+  if(document.querySelector('#playoffScoreStyles'))return;
+  const style=document.createElement('style');style.id='playoffScoreStyles';
+  style.textContent=`.playoff-score-side{display:flex;align-items:center;gap:8px;min-width:0;flex:1}.playoff-score-side .playoff-pick{flex:1;min-width:0}.playoff-score-input{box-sizing:border-box;width:86px;max-width:32%;padding:9px 7px;border:1px solid var(--border,#777);border-radius:8px;background:#fff;color:#111;-webkit-text-fill-color:#111;font:inherit;appearance:textfield;-moz-appearance:textfield;font-size:14px;text-align:right}.playoff-score-input::-webkit-inner-spin-button,.playoff-score-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.playoff-score-input::placeholder{color:#666;-webkit-text-fill-color:#666}.playoff-score-input:focus{outline:2px solid var(--accent,#5589df);outline-offset:1px}@media(max-width:650px){.playoff-game{flex-wrap:wrap}.playoff-score-side{flex-basis:100%}.playoff-score-input{width:90px}}`;
+  document.head.appendChild(style);
+}
+
 const PLAYOFF_TIE='__TIE__';
 function playoffKey(year,week,a,b){return `${year}|${week}|${[a,b].sort().join('|')}`}
 function regularGamePairs(year){
@@ -283,8 +296,10 @@ function regularGamePairs(year){
 }
 function setupPlayoffMachinePage(){
   playoffPicks=new Map();
+  playoffScores=new Map();
   playoffActiveWeek=null;
-  document.querySelector('#playoffReset').onclick=()=>{playoffPicks=new Map();renderPlayoffMachine()};
+  setupPlayoffScoreStyles();
+  document.querySelector('#playoffReset').onclick=()=>{playoffPicks=new Map();playoffScores=new Map();renderPlayoffMachine()};
   document.querySelector('#playoffQuickWin').onclick=()=>quickPickPlayoffs('win');
   document.querySelector('#playoffQuickPF').onclick=()=>quickPickPlayoffs('pf');
   document.querySelector('#playoffQuickRandom').onclick=()=>quickPickPlayoffs('random');
@@ -337,6 +352,11 @@ function simulatedStandings(year,pairs){
       else if(g.bScore>g.aScore){b.w++;a.l++;h2h.push({a:g.a,b:g.b,winner:g.b})}
       else{a.t++;b.t++;h2h.push({a:g.a,b:g.b,winner:PLAYOFF_TIE})}
     }else{
+      // Scores are independent of the selected winner and may be entered for just one team.
+      const aScore=playoffScores.get(playoffScoreKey(g.key,g.a));
+      const bScore=playoffScores.get(playoffScoreKey(g.key,g.b));
+      if(aScore!==undefined){a.pf+=Number(aScore);b.pa+=Number(aScore)}
+      if(bScore!==undefined){b.pf+=Number(bScore);a.pa+=Number(bScore)}
       const pick=playoffPicks.get(g.key);if(!pick)continue;
       if(pick===PLAYOFF_TIE){a.t++;b.t++;h2h.push({a:g.a,b:g.b,winner:PLAYOFF_TIE})}
       else if(pick===g.a){a.w++;b.l++;h2h.push({a:g.a,b:g.b,winner:g.a})}
@@ -385,8 +405,20 @@ function renderPlayoffMachine(){
   const future=document.querySelector('#playoffGames'),weekGames=remaining.filter(g=>g.week===playoffActiveWeek);
   future.innerHTML=weekGames.length?`<div class="playoff-game-list">${weekGames.map(g=>{
     const pick=playoffPicks.get(g.key)||'';
-    return `<div class="playoff-game"><button class="playoff-pick ${pick===g.a?'selected':''}" data-key="${esc(g.key)}" data-pick="${esc(g.a)}">${identityHTML(y,g.a,g.aTeam,'stand-logo')}</button><button class="playoff-pick ${pick===g.b?'selected':''}" data-key="${esc(g.key)}" data-pick="${esc(g.b)}">${identityHTML(y,g.b,g.bTeam,'stand-logo')}</button>${pick===PLAYOFF_TIE?'<div class="playoff-tie-label">Projected tie</div>':''}</div>`}).join('')}</div>`:'<p class="muted">No remaining games.</p>';
+    return `<div class="playoff-game"><div class="playoff-score-side"><button class="playoff-pick ${pick===g.a?'selected':''}" data-key="${esc(g.key)}" data-pick="${esc(g.a)}">${identityHTML(y,g.a,g.aTeam,'stand-logo')}</button>${playoffScoreInput(g,g.a)}</div><div class="playoff-score-side"><button class="playoff-pick ${pick===g.b?'selected':''}" data-key="${esc(g.key)}" data-pick="${esc(g.b)}">${identityHTML(y,g.b,g.bTeam,'stand-logo')}</button>${playoffScoreInput(g,g.b)}</div>${pick===PLAYOFF_TIE?'<div class="playoff-tie-label">Projected tie</div>':''}</div>`}).join('')}</div>`:'<p class="muted">No remaining games.</p>';
   future.querySelectorAll('.playoff-pick').forEach(b=>b.onclick=()=>{playoffPicks.set(b.dataset.key,b.dataset.pick);renderPlayoffMachine()});
+  future.querySelectorAll('.playoff-score-input').forEach(input=>{
+    input.addEventListener('input',()=>{
+      const key=playoffScoreKey(input.dataset.key,input.dataset.owner),raw=input.value.trim();
+      if(raw===''||!Number.isFinite(Number(raw))||Number(raw)<0){playoffScores.delete(key)}
+      else playoffScores.set(key,Number(raw));
+      // Recalculate the standings without replacing the focused input.
+      renderPlayoffStandings(y,pairs,remaining);
+    });
+  });
+  renderPlayoffStandings(y,pairs,remaining);
+}
+function renderPlayoffStandings(y,pairs,remaining){
   const {standings,tieInfo}=simulatedStandings(y,pairs),picked=remaining.filter(g=>playoffPicks.has(g.key)).length;
   document.querySelector('#playoffStandings').innerHTML=standings.map((t,i)=>{const rec=t.t?`${t.w}-${t.l}-${t.t}`:`${t.w}-${t.l}`;const ti=teamInfo(y,t.owner,t.team);return `<tr class="${i<6?'playoff-in':''}"><td><strong>#${i+1}</strong></td><td><div class="playoff-team-cell"><img class="stand-logo" ${logoAttrs(ti.logo)} alt=""><div class="playoff-team-copy"><div class="playoff-team-name"><strong>${esc(ti.team)}</strong>${tiebreakInfoHTML(tieInfo.get(t.owner))}</div><small>${esc(t.owner)}</small></div></div></td><td><strong>${rec}</strong></td><td>${fmt(t.pf)}</td><td>${fmt(t.pa)}</td><td>${i<2?'1st Round Bye':i<6?'Playoffs':'Eliminated'}</td></tr>`}).join('');
   document.querySelector('#playoffProgress').textContent=remaining.length?`${picked} of ${remaining.length} remaining games selected`:'Regular season complete.';
