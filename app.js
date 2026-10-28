@@ -29,7 +29,7 @@ function setupNav(){
   }
   if(b&&s){b.addEventListener('click',()=>s.classList.toggle('open'));document.addEventListener('click',e=>{if(innerWidth<=850&&s.classList.contains('open')&&!s.contains(e.target)&&e.target!==b)s.classList.remove('open')})}
 }
-async function load(){setupNav();try{const page=document.body.dataset.page||'home';if(page==='roster-history'){await loadRosterHistoryPage();return;}if(page==='draft-recap'){await loadDraftRecapPage();return;}if(page==='trade-recap'){await loadTradeRecapPage();return;}const analysisPage=(page==='records'||page==='managers'||page==='research'||page==='dynasty'||page==='power-rankings'||page==='schedule-comparison'||page==='playoff-machine'||page==='playoff-odds');const needed=analysisPage?[URLS.ledger,URLS.settings]:[URLS.ledger,URLS.settings,URLS.home];if(page==='playoff-machine'||page==='playoff-odds')needed.push(URLS.schedule);const texts=await Promise.all(needed.map(u=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.text()})));const lr=csv(texts[0]),sr=csv(texts[1]);ledger=lr.slice(1).filter(r=>r[0]&&r[3]&&r[4]).map(r=>({owner:r[0].trim(),score:num(r[1]),opponent:r[2].trim(),year:String(r[3]).replace(/\.0$/,''),week:r[4].trim(),team:(r[5]||r[0]).trim(),oppScore:num(r[6]),outcome:(r[7]||'').trim().toLowerCase(),diff:num(r[12]),median:num(r[8]),weekRank:num(r[10]),consistency:num(r[11]),winStreak:num(r[14]),lossStreak:num(r[16]),medianOutcome:(r[9]||'').trim().toLowerCase(),seasonPoints:nullableNum(r[18]),seasonFinalPoints:nullableNum(r[20]),likelihood:parsePercent(r[22]),oppLikelihood:parsePercent(r[23])}));parseTeams(sr);if(page==='playoff-machine'||page==='playoff-odds'){const sched=csv(texts[2]);scheduleData=sched.slice(1).filter(r=>r[0]&&r[1]&&r[2]&&r[3]).map(r=>({year:String(r[0]).replace(/\.0$/,''),week:+r[1],a:r[2].trim(),b:r[3].trim()}));}if(page==='records'){renderRecords();document.querySelector('#status').textContent='Live records loaded';return}if(page==='managers'){setupManagerPage();document.querySelector('#status').textContent='Live manager history loaded';return}if(page==='research'){setupResearchPage();document.querySelector('#status').textContent='Live research data loaded';return}if(page==='dynasty'){setupDynastyPage();document.querySelector('#status').textContent='Live dynasty data loaded';return}if(page==='power-rankings'){setupPowerRankingsPage();document.querySelector('#status').textContent='Live power rankings loaded';return}if(page==='schedule-comparison'){setupScheduleComparisonPage();document.querySelector('#status').textContent='Live schedule comparison loaded';return}if(page==='playoff-machine'){setupPlayoffMachinePage();document.querySelector('#status').textContent='Live playoff machine loaded';return}if(page==='playoff-odds'){setupPlayoffOddsPage();return}const hr=csv(texts[2]);renderLeague(sr);parseChampions(hr);renderChampion();renderShrine();setupSelectors();document.querySelector('#status').textContent='Live data loaded'}catch(e){const status=document.querySelector('#status');if(status)status.textContent='Could not load live data';console.error(e)}}
+async function load(){setupNav();try{const page=document.body.dataset.page||'home';if(page==='roster-history'){await loadRosterHistoryPage();return;}if(page==='draft-recap'){await loadDraftRecapPage();return;}if(page==='trade-recap'){await loadTradeRecapPage();return;}const analysisPage=(page==='records'||page==='managers'||page==='research'||page==='dynasty'||page==='power-rankings'||page==='schedule-comparison'||page==='playoff-machine'||page==='playoff-odds');const needed=analysisPage?[URLS.ledger,URLS.settings]:[URLS.ledger,URLS.settings,URLS.home];if(page==='playoff-machine'||page==='playoff-odds')needed.push(URLS.schedule);const texts=await Promise.all(needed.map(u=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.text()})));const lr=csv(texts[0]),sr=csv(texts[1]);ledger=lr.slice(1).filter(r=>r[0]&&r[3]&&r[4]).map(r=>({owner:r[0].trim(),score:num(r[1]),opponent:r[2].trim(),year:String(r[3]).replace(/\.0$/,''),week:r[4].trim(),team:(r[5]||r[0]).trim(),oppScore:num(r[6]),outcome:(r[7]||'').trim().toLowerCase(),diff:num(r[12]),median:num(r[8]),weekRank:num(r[10]),consistency:num(r[11]),winStreak:num(r[14]),lossStreak:num(r[16]),medianOutcome:(r[9]||'').trim().toLowerCase(),seasonPoints:nullableNum(r[18]),seasonFinalPoints:nullableNum(r[20]),likelihood:parsePercent(r[22]),oppLikelihood:parsePercent(r[23])}));parseTeams(sr);if(page==='playoff-machine'||page==='playoff-odds'){const sched=csv(texts[2]);scheduleData=sched.slice(1).filter(r=>r[0]&&r[1]&&r[2]&&r[3]).map(r=>({year:String(r[0]).replace(/\.0$/,''),week:+r[1],a:r[2].trim(),b:r[3].trim()}));}if(page==='records'){renderRecords();document.querySelector('#status').textContent='Live records loaded';return}if(page==='managers'){setupManagerPage();document.querySelector('#status').textContent='Live manager history loaded';return}if(page==='research'){setupResearchPage();document.querySelector('#status').textContent='Live research data loaded';return}if(page==='dynasty'){setupDynastyPage();document.querySelector('#status').textContent='Live dynasty data loaded';return}if(page==='power-rankings'){setupPowerRankingsPage();document.querySelector('#status').textContent='Live power rankings loaded';return}if(page==='schedule-comparison'){setupScheduleComparisonPage();document.querySelector('#status').textContent='Live schedule comparison loaded';return}if(page==='playoff-machine'){setupPlayoffMachinePage();return}if(page==='playoff-odds'){setupPlayoffOddsPage();return}const hr=csv(texts[2]);renderLeague(sr);parseChampions(hr);renderChampion();renderShrine();setupSelectors();document.querySelector('#status').textContent='Live data loaded'}catch(e){const status=document.querySelector('#status');if(status)status.textContent='Could not load live data';console.error(e)}}
 function renderLeague(r){const at=(row,col)=>r[row-1]?.[col-1]?.trim()||'';document.querySelector('#leagueName').textContent=at(5,7)||'Rumble of Regards NFL';const size=at(17,7),info=at(8,7);document.querySelector('#leagueMeta').textContent=[size?`${parseInt(size)} Team`:'',info].filter(Boolean).join(' • ')}
 function parseTeams(r){teams=[];for(let i=4;i<r.length;i++){const row=r[i]||[],year=String(row[0]||'').replace(/\.0$/,'').trim(),owner=String(row[1]||'').trim(),team=String(row[2]||'').trim(),logo=String(row[4]||'').trim();if(/^\d{4}$/.test(year)&&owner&&team)teams.push({year,owner,team,logo:logo||FALLBACK_LOGO})}}
 function teamInfo(year,owner,fallbackTeam=''){return teams.find(t=>t.year===String(year)&&t.owner===owner)||{year:String(year),owner,team:fallbackTeam||owner,logo:FALLBACK_LOGO}}
@@ -266,6 +266,8 @@ function renderScheduleComparison(){
 let playoffPicks=new Map();
 let playoffScores=new Map(); // Optional scores, keyed by matchup and owner
 let playoffActiveWeek=null;
+let playoffOddsTimer=null;
+let playoffOddsRun=0;
 function playoffScoreKey(gameKey,owner){return JSON.stringify([gameKey,owner])}
 function playoffScoreInput(game,owner){
   const value=playoffScores.get(playoffScoreKey(game.key,owner));
@@ -299,11 +301,12 @@ function setupPlayoffMachinePage(){
   playoffScores=new Map();
   playoffActiveWeek=null;
   setupPlayoffScoreStyles();
-  document.querySelector('#playoffReset').onclick=()=>{playoffPicks=new Map();playoffScores=new Map();renderPlayoffMachine()};
+  document.querySelector('#playoffReset').onclick=()=>{playoffPicks=new Map();playoffScores=new Map();renderPlayoffMachine();scheduleConditionalOdds()};
   document.querySelector('#playoffQuickWin').onclick=()=>quickPickPlayoffs('win');
   document.querySelector('#playoffQuickPF').onclick=()=>quickPickPlayoffs('pf');
   document.querySelector('#playoffQuickRandom').onclick=()=>quickPickPlayoffs('random');
   renderPlayoffMachine();
+  scheduleConditionalOdds(0);
 }
 function currentPlayoffYear(){
   const years=[...new Set((scheduleData.length?scheduleData.map(x=>x.year):ledger.filter(x=>/^\d+$/.test(x.week)).map(x=>x.year)))].sort((a,b)=>+b-+a);
@@ -339,6 +342,7 @@ function quickPickPlayoffs(mode){
     else{b.w++;a.l++}
   }
   renderPlayoffMachine();
+  scheduleConditionalOdds();
 }
 function simulatedStandings(year,pairs){
   const owners=[...new Set(pairs.flatMap(g=>[g.a,g.b]))];
@@ -406,7 +410,7 @@ function renderPlayoffMachine(){
   future.innerHTML=weekGames.length?`<div class="playoff-game-list">${weekGames.map(g=>{
     const pick=playoffPicks.get(g.key)||'';
     return `<div class="playoff-game"><div class="playoff-score-side"><button class="playoff-pick ${pick===g.a?'selected':''}" data-key="${esc(g.key)}" data-pick="${esc(g.a)}">${identityHTML(y,g.a,g.aTeam,'stand-logo')}</button>${playoffScoreInput(g,g.a)}</div><div class="playoff-score-side"><button class="playoff-pick ${pick===g.b?'selected':''}" data-key="${esc(g.key)}" data-pick="${esc(g.b)}">${identityHTML(y,g.b,g.bTeam,'stand-logo')}</button>${playoffScoreInput(g,g.b)}</div>${pick===PLAYOFF_TIE?'<div class="playoff-tie-label">Projected tie</div>':''}</div>`}).join('')}</div>`:'<p class="muted">No remaining games.</p>';
-  future.querySelectorAll('.playoff-pick').forEach(b=>b.onclick=()=>{playoffPicks.set(b.dataset.key,b.dataset.pick);renderPlayoffMachine()});
+  future.querySelectorAll('.playoff-pick').forEach(b=>b.onclick=()=>{if(playoffPicks.get(b.dataset.key)===b.dataset.pick)playoffPicks.delete(b.dataset.key);else playoffPicks.set(b.dataset.key,b.dataset.pick);renderPlayoffMachine();scheduleConditionalOdds()});
   future.querySelectorAll('.playoff-score-input').forEach(input=>{
     input.addEventListener('input',()=>{
       const key=playoffScoreKey(input.dataset.key,input.dataset.owner),raw=input.value.trim();
@@ -414,13 +418,15 @@ function renderPlayoffMachine(){
       else playoffScores.set(key,Number(raw));
       // Recalculate the standings without replacing the focused input.
       renderPlayoffStandings(y,pairs,remaining);
+      scheduleConditionalOdds();
     });
   });
   renderPlayoffStandings(y,pairs,remaining);
 }
 function renderPlayoffStandings(y,pairs,remaining){
   const {standings,tieInfo}=simulatedStandings(y,pairs),picked=remaining.filter(g=>playoffPicks.has(g.key)).length;
-  document.querySelector('#playoffStandings').innerHTML=standings.map((t,i)=>{const rec=t.t?`${t.w}-${t.l}-${t.t}`:`${t.w}-${t.l}`;const ti=teamInfo(y,t.owner,t.team);return `<tr class="${i<6?'playoff-in':''}"><td><strong>#${i+1}</strong></td><td><div class="playoff-team-cell"><img class="stand-logo" ${logoAttrs(ti.logo)} alt=""><div class="playoff-team-copy"><div class="playoff-team-name"><strong>${esc(ti.team)}</strong>${tiebreakInfoHTML(tieInfo.get(t.owner))}</div><small>${esc(t.owner)}</small></div></div></td><td><strong>${rec}</strong></td><td>${fmt(t.pf)}</td><td>${fmt(t.pa)}</td><td>${i<2?'1st Round Bye':i<6?'Playoffs':'Eliminated'}</td></tr>`}).join('');
+  document.querySelector('#playoffStandings').innerHTML=standings.map((t,i)=>{const rec=t.t?`${t.w}-${t.l}-${t.t}`:`${t.w}-${t.l}`;const ti=teamInfo(y,t.owner,t.team);return `<tr class="${i<6?'playoff-in':''}"><td><strong>#${i+1}</strong></td><td><div class="playoff-team-cell"><img class="stand-logo" ${logoAttrs(ti.logo)} alt=""><div class="playoff-team-copy"><div class="playoff-team-name"><strong>${esc(ti.team)}</strong>${tiebreakInfoHTML(tieInfo.get(t.owner))}</div><small>${esc(t.owner)}</small></div></div></td><td><strong>${rec}</strong></td><td>${fmt(t.pf)}</td><td>${fmt(t.pa)}</td><td>${i<2?'1st Round Bye':i<6?'Playoffs':'Eliminated'}</td>${Array.from({length:9},(_,j)=>`<td class="conditional-odds ${j===8?'odds-total':j<2?'odds-bye':j>5?'odds-out':''}" data-owner="${esc(t.owner)}" data-seed="${j}">—</td>`).join('')}</tr>`}).join('');
+  if(window.playoffOddsLast)paintConditionalOdds(window.playoffOddsLast);
   document.querySelector('#playoffProgress').textContent=remaining.length?`${picked} of ${remaining.length} remaining games selected`:'Regular season complete.';
 }
 
@@ -498,6 +504,65 @@ function renderPlayoffOdds(){
     const rows=owners.map(o=>({owner:o,team:teamInfo(y,o,o).team,c:counts.get(o),playoffs:counts.get(o).slice(0,6).reduce((a,b)=>a+b,0),pf:actualPF.get(o)})).sort((a,b)=>b.playoffs-a.playoffs||b.c[0]-a.c[0]||b.pf-a.pf||a.owner.localeCompare(b.owner));
     const pct=n=>`${(n/ODDS_SIMS*100).toFixed(n===0||n===ODDS_SIMS?0:1)}%`;
     document.querySelector('#oddsResults').innerHTML=rows.map(r=>`<tr><td>${identityHTML(y,r.owner,r.team,'stand-logo')}</td>${r.c.map((n,i)=>`<td class="${i<2?'odds-bye':i>5?'odds-out':''}">${pct(n)}</td>`).join('')}<td class="odds-total"><strong>${pct(r.playoffs)}</strong></td></tr>`).join('');
+    status.textContent=`${ODDS_SIMS.toLocaleString()} simulations complete`;
+  },20);
+}
+
+
+// A debounced conditional Monte Carlo simulation, sharing the Playoff Machine selections.
+function scheduleConditionalOdds(delay=1000){
+  clearTimeout(playoffOddsTimer);
+  const token=++playoffOddsRun;
+  const status=document.querySelector('#oddsStatus');
+  if(status)status.textContent=delay?'Waiting for selections…':'Calculating…';
+  playoffOddsTimer=setTimeout(()=>runConditionalOdds(token),delay);
+}
+function paintConditionalOdds(counts){
+  const pct=n=>`${(100*n/ODDS_SIMS).toFixed(n===0||n===ODDS_SIMS?0:1)}%`;
+  document.querySelectorAll('.conditional-odds').forEach(cell=>{
+    const values=counts.get(cell.dataset.owner);
+    if(!values)return;
+    const seed=+cell.dataset.seed;
+    cell.textContent=pct(seed===8?values.slice(0,6).reduce((a,b)=>a+b,0):values[seed]);
+  });
+}
+function runConditionalOdds(token){
+  if(token!==playoffOddsRun)return;
+  const status=document.querySelector('#oddsStatus');
+  status.textContent='Running 10,000 simulations…';
+  setTimeout(()=>{
+    if(token!==playoffOddsRun)return;
+    const year=currentPlayoffYear(),schedule=regularGamePairs(year);
+    const owners=[...new Set(schedule.flatMap(g=>[g.a,g.b]))];
+    const hist=ledger.filter(x=>x.year===year&&/^\d+$/.test(x.week));
+    const dist=new Map(owners.map(o=>[o,oddsDistribution(hist.filter(x=>x.owner===o).map(x=>x.score))]));
+    if([...dist.values()].some(x=>!Number.isFinite(x.mean))){status.textContent='Not enough scoring history';return;}
+    const counts=new Map(owners.map(o=>[o,Array(owners.length).fill(0)]));
+    for(let sim=0;sim<ODDS_SIMS;sim++){
+      const stats=new Map(owners.map(o=>[o,{owner:o,w:0,l:0,t:0,pf:0,pa:0}])),h2h=[];
+      for(const g of schedule){
+        const a=stats.get(g.a),b=stats.get(g.b);
+        let as,bs,winner;
+        if(g.played){as=g.aScore;bs=g.bScore;}
+        else{
+          const aFixed=playoffScores.get(playoffScoreKey(g.key,g.a));
+          const bFixed=playoffScores.get(playoffScoreKey(g.key,g.b));
+          as=aFixed===undefined?oddsNormal(dist.get(g.a).mean,dist.get(g.a).sd):aFixed;
+          bs=bFixed===undefined?oddsNormal(dist.get(g.b).mean,dist.get(g.b).sd):bFixed;
+          const pick=playoffPicks.get(g.key);
+          // Selected winners are guaranteed; projected points remain independent for tiebreaks.
+          if(pick===g.a||pick===g.b||pick===PLAYOFF_TIE)winner=pick;
+        }
+        a.pf+=as;a.pa+=bs;b.pf+=bs;b.pa+=as;
+        winner=winner||(as>bs?g.a:bs>as?g.b:PLAYOFF_TIE);
+        if(winner===g.a){a.w++;b.l++;}else if(winner===g.b){b.w++;a.l++;}else{a.t++;b.t++;}
+        h2h.push({a:g.a,b:g.b,winner});
+      }
+      seedSimulatedSeason(owners,stats,h2h).forEach((t,i)=>counts.get(t.owner)[i]++);
+    }
+    if(token!==playoffOddsRun)return;
+    window.playoffOddsLast=counts;
+    paintConditionalOdds(counts);
     status.textContent=`${ODDS_SIMS.toLocaleString()} simulations complete`;
   },20);
 }
