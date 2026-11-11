@@ -154,3 +154,12 @@ footer a:hover {
 
 /* Trade recap */
 .trade-recap-selectors{display:flex;justify-content:center}.trade-recap-list{display:flex;flex-direction:column;gap:16px}.trade-recap-card{border:1px solid var(--line);border-radius:14px;background:#0d1014;overflow:hidden}.trade-recap-week{padding:9px 14px;border-bottom:1px solid var(--line);color:var(--accent);font-size:.72rem;font-weight:950;text-transform:uppercase;letter-spacing:.09em}.trade-recap-sides{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:18px;align-items:stretch;padding:18px}.trade-recap-side{min-width:0}.trade-recap-team{display:flex;align-items:center;gap:12px;padding-bottom:12px;margin-bottom:8px;border-bottom:1px solid var(--line)}.trade-recap-team img{width:48px;height:48px;object-fit:contain;border-radius:9px;flex:0 0 48px}.trade-recap-team>div{display:flex;flex-direction:column;gap:3px;min-width:0}.trade-recap-team strong{font-size:1rem}.trade-recap-team small{color:var(--muted)}.trade-recap-players{display:flex;flex-direction:column;gap:5px}.trade-recap-player{display:flex;align-items:center;gap:8px;font-weight:800}.trade-recap-player .move-sign{font-size:1.05rem;width:18px}.trade-recap-arrow{display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:1.5rem;font-weight:950;padding:0 4px}@media(max-width:650px){.trade-recap-sides{grid-template-columns:1fr}.trade-recap-arrow{transform:rotate(90deg);padding:0}.trade-recap-team img{width:42px;height:42px;flex-basis:42px}}
+
+/* Clinching key, consistent on homepage and Playoff Machine */
+.clinch-legend{display:flex;flex-wrap:wrap;gap:6px 17px;align-items:center;margin:8px 0 12px;font-size:12px;color:var(--muted,#777)}
+.clinch-legend span{display:inline-flex;gap:5px;align-items:center;white-space:nowrap}
+.clinch-legend strong{font-size:12px;color:var(--text,#222);font-weight:800}
+
+/* Clinching key: use the same subtle footnote treatment on both standings tables. */
+.clinch-key{margin-top:14px!important;margin-bottom:0!important;line-height:1.6}
+.clinch-key strong{color:inherit;font-size:inherit;font-weight:800}
