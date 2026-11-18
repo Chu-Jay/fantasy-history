@@ -72,75 +72,30 @@ function renderWeeklyMatchups(y,w){
 }
 function h2hCompare(a,b,y){const games=ledger.filter(x=>x.year===y&&!x.week.startsWith('P')&&x.owner===a.owner&&x.opponent===b.owner);if(!games.length)return 0;const aw=games.filter(x=>x.outcome==='w').length,bw=games.filter(x=>x.outcome==='l').length;return aw===bw?0:aw>bw?-1:1}
 function sortTieGroup(group,y){
-  // ESPN-style recursive seeding: award the highest available seed to one team,
-  // remove that team, then restart the tiebreaker from H2H for the remaining teams.
-  const remaining=[...group],seeded=[];
+  // Current standings use the same completed-game H2H rules as the scenario
+  // engine: equal intra-group matchup counts, a one-team winner, then restart.
+  const remaining=group.slice(),seeds=[];
+  const games=ledger.filter(x=>x.year===String(y)&&!x.week.startsWith('P'));
   while(remaining.length){
-    if(remaining.length===1){seeded.push(remaining[0]);break}
-
-    const set=new Set(remaining.map(t=>t.owner));
-    const rec=new Map(remaining.map(t=>[t.owner,{w:0,l:0,g:0}]));
-    for(const x of ledger.filter(x=>x.year===y&&!x.week.startsWith('P')&&set.has(x.owner)&&set.has(x.opponent))){
-      const r=rec.get(x.owner);r.g++;
-      if(x.outcome==='w')r.w++;
-      else if(x.outcome==='l')r.l++;
+    if(remaining.length===1){seeds.push(remaining[0]);break}
+    const owners=new Set(remaining.map(t=>t.owner));
+    const hh=new Map(remaining.map(t=>[t.owner,{g:0,p:0}]));
+    for(const g of games){if(!owners.has(g.owner)||!owners.has(g.opponent))continue;
+      const r=hh.get(g.owner);r.g++;r.p+=g.score>g.oppScore?2:g.score===g.oppScore?1:0;
     }
-
-    // H2H is valid only if every currently tied team has played the same
-    // number of games against the other teams still in this tie.
-    const games=[...rec.values()].map(r=>r.g);
-    const h2hValid=games.length>0&&games[0]>0&&games.every(g=>g===games[0]);
-
-    let winner;
-    if(h2hValid){
-      winner=[...remaining].sort((a,b)=>{
-        const ra=rec.get(a.owner),rb=rec.get(b.owner);
-        const pa=ra.w/(ra.w+ra.l||1),pb=rb.w/(rb.w+rb.l||1);
-        return pb-pa||b.pf-a.pf;
-      })[0];
-    }else{
-      winner=[...remaining].sort((a,b)=>b.pf-a.pf)[0];
-    }
-
-    seeded.push(winner);
-    remaining.splice(remaining.findIndex(t=>t.owner===winner.owner),1);
-    // Loop restarts here, recalculating H2H using only the teams still tied.
+    const counts=[...hh.values()].map(r=>r.g),valid=counts[0]>0&&counts.every(x=>x===counts[0]);
+    let eligible=remaining.slice();
+    if(valid){const high=Math.max(...eligible.map(x=>hh.get(x.owner).p));eligible=eligible.filter(x=>hh.get(x.owner).p===high)}
+    if(eligible.length>1){const high=Math.max(...eligible.map(x=>Math.round(x.pf*100)));eligible=eligible.filter(x=>Math.round(x.pf*100)===high)}
+    if(eligible.length>1){const high=Math.max(...eligible.map(x=>Math.round(x.pa*100)));eligible=eligible.filter(x=>Math.round(x.pa*100)===high)}
+    // Only display order is stable when all ESPN tiebreakers are still equal.
+    eligible.sort((a,b)=>a.owner.localeCompare(b.owner));
+    const winner=eligible[0];seeds.push(winner);
+    remaining.splice(remaining.findIndex(x=>x.owner===winner.owner),1);
   }
-  return seeded;
+  return seeds;
 }
-// Clinching markers: x = playoff berth, y = bye, z = #1 seed, e = eliminated.
-// Undecided games are treated as capable of either result (or a tie).
-// Tied records are conservatively treated as unresolved, never as guaranteed.
-function playoffClinchMarks(year,pairs,actualOnly=false){
-  const owners=[...new Set(pairs.flatMap(g=>[g.a,g.b]))];
-  if(owners.length!==8||!pairs.length)return new Map();
-  const actual=actualSeasonStats(year,pairs);
-  // Homepage ignores hypothetical Playoff Machine selections.
-  const limits=new Map(owners.map(o=>{
-    const r=actual.get(o),games=pairs.filter(g=>!g.played&& (actualOnly||!playoffPicks.get(g.key))&& (g.a===o||g.b===o)).length;
-    let fixedW=0,fixedT=0;
-    for(const g of pairs.filter(g=>!g.played&&!actualOnly&&playoffPicks.has(g.key))){
-      if(g.a!==o&&g.b!==o)continue;
-      const pick=playoffPicks.get(g.key);
-      if(pick===o)fixedW++;else if(pick===PLAYOFF_TIE)fixedT++;
-    }
-    return[o,{min:2*(r.w+fixedW)+r.t+fixedT,max:2*(r.w+fixedW+games)+r.t+fixedT}];
-  }));
-  const marks=new Map();
-  for(const o of owners){
-    const a=limits.get(o);
-    const guaranteedAhead=owners.filter(b=>b!==o&&limits.get(b).min>a.max).length;
-    const possiblyAhead=owners.filter(b=>b!==o&&limits.get(b).max>=a.min).length;
-    // Only strict record advantages can establish a clinch while scores remain unknown.
-    let mark='';
-    if(guaranteedAhead>=6)mark='e';
-    else if(possiblyAhead===0)mark='xyz';
-    else if(possiblyAhead<=1)mark='xy';
-    else if(possiblyAhead<=5)mark='x';
-    marks.set(o,mark);
-  }
-  return marks;
-}
+
 function playoffStatusHTML(mark){
   return mark?`<span class="clinch-marker" title="${mark==='e'?'Eliminated':mark==='xyz'?'Clinched #1 seed and bye':mark==='xy'?'Clinched first-round bye':'Clinched playoffs'}">${mark}</span>`:'';
 }
@@ -150,7 +105,50 @@ function clinchStandingsStyles(){
   style.textContent='.clinch-team-cell{display:flex;align-items:center;gap:7px;min-width:0}.clinch-marker{display:inline-flex;align-items:center;justify-content:center;min-width:30px;font-size:26px;font-weight:800;letter-spacing:.3px;color:var(--text,#222);flex-shrink:0}.clinch-team-cell>.team-ident{min-width:0}.clinch-team-cell .playoff-team-cell{flex:1;min-width:0}';
   document.head.appendChild(style);
 }
-function renderStandings(y){const rows=ledger.filter(x=>x.year===y&&!x.week.startsWith('P')),map=new Map;for(const x of rows){const key=x.owner;if(!map.has(key))map.set(key,{owner:key,team:x.team,w:0,l:0,pf:0,pa:0,scores:[],games:0});const t=map.get(key);t.games++;t.pf+=x.score;t.pa+=x.oppScore;t.scores.push(x.score);if(x.outcome==='w')t.w++;else if(x.outcome==='l')t.l++}let raw=[...map.values()].map(t=>({...t,pct:t.w/(t.w+t.l||1),avg:t.pf/(t.games||1),avgpa:t.pa/(t.games||1),hi:Math.max(...t.scores),lo:Math.min(...t.scores)})).sort((a,b)=>b.w-a.w);let s=[];for(let i=0;i<raw.length;){let j=i+1;while(j<raw.length&&raw[j].w===raw[i].w&&raw[j].l===raw[i].l)j++;s.push(...sortTieGroup(raw.slice(i,j),y));i=j}clinchStandingsStyles();const clinch=playoffClinchMarks(y,regularGamePairs(y),true);document.querySelector('#standingsTitle').textContent=`${y} Standings`;document.querySelector('#standings').innerHTML=s.map((t,i)=>`<tr><td>${i+1}</td><td><div class="clinch-team-cell">${playoffStatusHTML(clinch.get(t.owner))}${identityHTML(y,t.owner,t.team,'stand-logo')}</div></td><td>${t.w}-${t.l}</td><td>${pct(t.pct)}</td><td>${fmt(t.avg)}</td><td>${fmt(t.pf)}</td><td>${fmt(t.hi)}</td><td>${fmt(t.lo)}</td><td>${fmt(t.avgpa)}</td><td>${fmt(t.pa)}</td></tr>`).join('')}
+const homeClinchCache=new Map();
+let homeClinchWorker=null,homeClinchRun=0;
+function updateHomeClinchMarks(y){
+  const standings=document.querySelector('#standings');if(!standings)return;
+  const marked=homeClinchCache.get(y)||new Map();
+  standings.querySelectorAll('tr[data-owner]').forEach(tr=>{
+    const box=tr.querySelector('.clinch-team-cell');if(!box)return;
+    const current=box.querySelector('.clinch-marker');if(current)current.remove();
+    const marker=marked.get(tr.dataset.owner);if(marker)box.insertAdjacentHTML('afterbegin',playoffStatusHTML(marker));
+  });
+}
+function requestHomeClinchMarks(y){
+  if(homeClinchCache.has(y)){updateHomeClinchMarks(y);return}
+  const pairs=regularGamePairs(y);
+  if(new Set(pairs.flatMap(g=>[g.a,g.b])).size!==8||!window.Worker)return;
+  if(homeClinchWorker){homeClinchWorker.terminate();homeClinchWorker=null}
+  const token=++homeClinchRun;
+  homeClinchWorker=new Worker(ROOT+'scenario-worker.js');
+  homeClinchWorker.onmessage=e=>{
+    const result=e.data;if(result.type!=='marks'||token!==homeClinchRun)return;
+    homeClinchCache.set(y,new Map(result.owners.map((owner,i)=>[owner,result.marks[i]])));
+    if(document.querySelector('#yearSelect')?.value===y)updateHomeClinchMarks(y);
+    homeClinchWorker.terminate();homeClinchWorker=null;
+  };
+  homeClinchWorker.postMessage({type:'marks',token,pairs,forced:{}});
+}
+function renderStandings(y){
+  const rows=ledger.filter(x=>x.year===y&&!x.week.startsWith('P')),map=new Map();
+  for(const x of rows){const key=x.owner;
+    if(!map.has(key))map.set(key,{owner:key,team:x.team,w:0,l:0,t:0,pf:0,pa:0,scores:[],games:0});
+    const t=map.get(key);t.games++;t.pf+=x.score;t.pa+=x.oppScore;t.scores.push(x.score);
+    if(x.score>x.oppScore)t.w++;else if(x.score<x.oppScore)t.l++;else t.t++;
+  }
+  const raw=[...map.values()].map(t=>({...t,pct:(t.w+0.5*t.t)/(t.games||1),avg:t.pf/(t.games||1),avgpa:t.pa/(t.games||1),hi:Math.max(...t.scores),lo:Math.min(...t.scores)}))
+    .sort((a,b)=>b.pct-a.pct);
+  const ranks=[];
+  for(let i=0;i<raw.length;){let j=i+1;while(j<raw.length&&Math.abs(raw[j].pct-raw[i].pct)<1e-12)j++;
+    ranks.push(...sortTieGroup(raw.slice(i,j),y));i=j;
+  }
+  clinchStandingsStyles();
+  document.querySelector('#standingsTitle').textContent=`${y} Standings`;
+  document.querySelector('#standings').innerHTML=ranks.map((t,i)=>`<tr data-owner="${esc(t.owner)}"><td>${i+1}</td><td><div class="clinch-team-cell">${identityHTML(y,t.owner,t.team,'stand-logo')}</div></td><td>${t.w}-${t.l}${t.t?'-'+t.t:''}</td><td>${pct(t.pct)}</td><td>${fmt(t.avg)}</td><td>${fmt(t.pf)}</td><td>${fmt(t.hi)}</td><td>${fmt(t.lo)}</td><td>${fmt(t.avgpa)}</td><td>${fmt(t.pa)}</td></tr>`).join('');
+  requestHomeClinchMarks(y);
+}
 function recordIdentity(year,owner,team){return identityHTML(String(year),owner,team,'team-logo')}
 function renderRecordRows(id,items,valueFn,detailFn){const el=document.querySelector(id);if(!el)return;el.innerHTML=items.map((x,i)=>`<div class="record-row"><span class="record-rank">${i+1}</span><div>${recordIdentity(x.year,x.owner,x.team)}<div class="record-detail">${detailFn(x)}</div></div><span class="record-value">${valueFn(x)}</span></div>`).join('')||'<p class="muted">No record data.</p>'}
 function recordGameHTML(x,i,label,value){const winner=teamInfo(x.year,x.owner,x.team),loser=teamInfo(x.year,x.opponent,x.opponent);return `<article class="record-game"><div class="record-game-head"><span>#${i+1} • ${esc(x.year)} • ${esc(displayWeek(x.week))}</span><strong>${esc(value)}${label?' '+esc(label):''}</strong></div><div class="game-team winner">${recordIdentity(x.year,x.owner,winner.team)}<span class="game-score">${fmt(x.score)}</span></div><div class="game-team loser">${recordIdentity(x.year,x.opponent,loser.team)}<span class="game-score">${fmt(x.oppScore)}</span></div></article>`}
@@ -339,16 +337,112 @@ function regularGamePairs(year){
   if(!out.length)out.push(...completed.values());
   return out.sort((a,b)=>a.week-b.week||a.a.localeCompare(b.a));
 }
+// Exact clinching scenarios run in a dedicated Web Worker. User picks and
+// projected point entries never influence these public/actual scenarios.
+let scenarioWorker=null,scenarioToken=0,actualScenarioMarks=new Map();
+let scenarioMarksWorker=null,scenarioMarksToken=0,projectedScenarioMarks=new Map();
+let projectedMarksTimer=null,scenarioYear='';
+let selectedScenarioOwner='';
+function attachClinchMarkers(){
+  const y=currentPlayoffYear(),pairs=regularGamePairs(y);
+  const current=playoffPicks.size?projectedScenarioMarks:actualScenarioMarks;
+  const rows=document.querySelectorAll('#playoffStandings tr');
+  for(const tr of rows){
+    const team=tr.dataset.owner,container=tr.querySelector('.clinch-team-cell');
+    if(!container||!team)continue;
+    const existing=container.querySelector('.clinch-marker');if(existing)existing.remove();
+    const mark=current.get(team);if(mark)container.insertAdjacentHTML('afterbegin',playoffStatusHTML(mark));
+  }
+}
+function startProjectedClinchMarks(){
+  clearTimeout(projectedMarksTimer);
+  if(!playoffPicks.size){projectedScenarioMarks=new Map();attachClinchMarkers();return}
+  projectedScenarioMarks=new Map();attachClinchMarkers();
+  projectedMarksTimer=setTimeout(()=>{
+    const y=currentPlayoffYear(),pairs=regularGamePairs(y),forced={};
+    for(const g of pairs.filter(g=>!g.played)){
+      const pick=playoffPicks.get(g.key);
+      if(pick===g.a)forced[g.key]=0;
+      else if(pick===g.b)forced[g.key]=1;
+      else if(pick===PLAYOFF_TIE)forced[g.key]=2;
+    }
+    if(!scenarioMarksWorker){scenarioMarksWorker=new Worker(ROOT+'scenario-worker.js');scenarioMarksWorker.onmessage=e=>{
+      const r=e.data;if(r.token!==scenarioMarksToken||r.type!=='marks')return;
+      projectedScenarioMarks=new Map(r.owners.map((o,i)=>[o,r.marks[i]]));attachClinchMarkers();
+    }}
+    scenarioMarksWorker.postMessage({type:'marks',token:++scenarioMarksToken,pairs,forced});
+  },250);
+}
+function describeScenarioPattern(pattern,games,year){
+  return pattern.map((v,i)=>{
+    if(v===-1)return null;
+    const g=games[i],a=teamInfo(year,g.a,g.a).team,b=teamInfo(year,g.b,g.b).team;
+    return v===0?`${a} beats ${b}`:v===1?`${b} beats ${a}`:`${a} ties ${b}`;
+  }).filter(Boolean).join(' AND ');
+}
+function renderNextWeekScenarios(){
+  const root=document.querySelector('#playoffScenarios');if(!root)return;
+  const year=currentPlayoffYear(),pairs=regularGamePairs(year),remaining=pairs.filter(g=>!g.played);
+  scenarioYear=year;
+  if(!remaining.length){root.innerHTML='<p class="muted">The regular season is complete.</p>';return}
+  const week=Math.min(...remaining.map(g=>g.week));
+  const header=`<h2>Week ${week} Clinching &amp; Elimination Scenarios</h2>`;
+  const owners=[...new Set(pairs.flatMap(g=>[g.a,g.b]))].sort((a,b)=>teamInfo(year,a,a).team.localeCompare(teamInfo(year,b,b).team));
+  if(!owners.includes(selectedScenarioOwner))selectedScenarioOwner=owners[0]||'';
+  const selector=`<div class="scenario-picker"><label for="scenarioTeamSelect">Select a team</label><select id="scenarioTeamSelect">${owners.map(o=>`<option value="${esc(o)}" ${o===selectedScenarioOwner?'selected':''}>${esc(teamInfo(year,o,o).team)}</option>`).join('')}</select></div>`;
+  root.innerHTML=header+selector+'<div id="scenarioResults"><p class="muted" id="scenarioStatus">Checking every possible outcome using the remaining schedule and head-to-head tiebreakers…</p></div>';
+  root.querySelector('#scenarioTeamSelect').addEventListener('change',e=>{selectedScenarioOwner=e.target.value;showSelectedScenarios()});
+  let scenarioResult=null;
+  function showSelectedScenarios(){
+    const target=root.querySelector('#scenarioResults');if(!target||!scenarioResult)return;
+    const data=scenarioResult;
+    const entry=data.scenarios.find(e=>e.owner===selectedScenarioOwner);
+    const levels=entry?.levels||[];
+    const blocks=levels.map(level=>`<div class="scenario-milestone"><h4>${esc(level.label)}</h4>${level.patterns.map(p=>{
+      const result=data.finalWeek?[describeScenarioPattern(p.pattern,data.games,year),...p.conditions].filter(Boolean).join(' AND '):describeScenarioPattern(p,data.games,year);
+      return `<p>${esc(result)}</p>`;
+    }).join('')}</div>`).join('');
+    target.innerHTML=(data.finalWeek?'<p class="muted scenario-explanation">Week 14 conditions use exact Points For and Points Against, including multi-team H2H and unresolved coin flips.</p>':'<p class="muted scenario-explanation">Results are verified against every feasible remaining win, loss, and tie.</p>')+(blocks||'<p class="muted scenario-empty">No clinching/elimination scenarios found for this team.</p>');
+  }
+  if(!window.Worker){root.innerHTML=header+'<p class="muted">This browser does not support background scenario calculations.</p>';return}
+  if(scenarioWorker){scenarioWorker.terminate();scenarioWorker=null}
+  try{
+    scenarioWorker=new Worker(ROOT+'scenario-worker.js');
+    const token=++scenarioToken;
+    scenarioWorker.onmessage=e=>{
+      const data=e.data;if(data.token!==scenarioToken)return;
+      if(data.type==='progress'){
+        const status=root.querySelector('#scenarioStatus');
+        if(status)status.textContent=`Verified ${data.done} of ${data.total} next-week outcome combinations…`;
+      }else if(data.type==='error'){
+        const target=root.querySelector('#scenarioResults');if(target)target.innerHTML=`<p class="muted">The scenario calculation could not complete: ${esc(data.message)}</p>`;
+      }else if(data.type==='complete'){
+        actualScenarioMarks=new Map(data.owners.map((o,i)=>[o,data.marks[i]]));
+        attachClinchMarkers();
+        scenarioResult=data;
+        showSelectedScenarios();
+      }
+    };
+    scenarioWorker.onerror=e=>{const target=root.querySelector('#scenarioResults');if(target)target.innerHTML=`<p class="muted">Scenario engine error: ${esc(e.message||'Unknown error')}</p>`};
+    scenarioWorker.postMessage({type:'calculate',token,pairs});
+  }catch(e){root.innerHTML=header+`<p class="muted">Scenario calculations require Web Worker support: ${esc(e.message)}</p>`}
+}
 function setupPlayoffMachinePage(){
   playoffPicks=new Map();
   playoffScores=new Map();
   playoffActiveWeek=null;
+  // Enforce visual order even if a cached HTML page has the old card order.
+  const main=document.querySelector('.playoff-machine-main');
+  const picker=main?.querySelector('.playoff-schedule-card');
+  const scenarios=main?.querySelector('.playoff-scenarios-card');
+  if(main&&picker&&scenarios){main.appendChild(picker);main.appendChild(scenarios)}
   setupPlayoffScoreStyles();
   document.querySelector('#playoffReset').onclick=()=>{playoffPicks=new Map();playoffScores=new Map();renderPlayoffMachine();scheduleConditionalOdds()};
   document.querySelector('#playoffQuickWin').onclick=()=>quickPickPlayoffs('win');
   document.querySelector('#playoffQuickPF').onclick=()=>quickPickPlayoffs('pf');
   document.querySelector('#playoffQuickRandom').onclick=()=>quickPickPlayoffs('random');
   renderPlayoffMachine();
+  renderNextWeekScenarios();
   scheduleConditionalOdds(0);
 }
 function currentPlayoffYear(){
@@ -424,8 +518,8 @@ function simulatedStandings(year,pairs){
         candidates=vals.filter(x=>Math.abs(x.p-best)<1e-12).map(x=>x.t);
         steps.push(`H2H: ${names.map(n=>{const r=rec.get(n);return `${n} ${r.w}-${r.l}${r.t?`-${r.t}`:''}`}).join(' • ')}`);
       }else steps.push('H2H skipped: tied teams have not played the same number of head-to-head games.');
-      if(candidates.length>1){const best=Math.max(...candidates.map(t=>t.pf));candidates=candidates.filter(t=>t.pf===best);steps.push(`Points For: ${rem.map(t=>`${t.owner} ${fmt(t.pf)}`).join(' • ')}`)}
-      if(candidates.length>1){const best=Math.min(...candidates.map(t=>t.pa));candidates=candidates.filter(t=>t.pa===best);steps.push(`Points Against: ${rem.map(t=>`${t.owner} ${fmt(t.pa)}`).join(' • ')}`)}
+      if(candidates.length>1){const best=Math.max(...candidates.map(t=>Math.round(t.pf*100)));candidates=candidates.filter(t=>Math.round(t.pf*100)===best);steps.push(`Points For: ${rem.map(t=>`${t.owner} ${fmt(t.pf)}`).join(' • ')}`)}
+      if(candidates.length>1){const best=Math.max(...candidates.map(t=>Math.round(t.pa*100)));candidates=candidates.filter(t=>Math.round(t.pa*100)===best);steps.push(`Points Against: ${rem.map(t=>`${t.owner} ${fmt(t.pa)}`).join(' • ')}`)}
       if(candidates.length>1){candidates.sort((a,b)=>a.owner.localeCompare(b.owner));steps.push('Still tied after known tiebreakers; stable display order is used until ESPN resolves the final tie.')}
       const winner=candidates[0];
       tieInfo.set(winner.owner,{title:`Tiebreaker among ${names.join(', ')}`,detail:steps.join('\n')});
@@ -452,8 +546,13 @@ function renderPlayoffMachine(){
   const future=document.querySelector('#playoffGames'),weekGames=remaining.filter(g=>g.week===playoffActiveWeek);
   future.innerHTML=weekGames.length?`<div class="playoff-game-list">${weekGames.map(g=>{
     const pick=playoffPicks.get(g.key)||'';
-    return `<div class="playoff-game"><div class="playoff-score-side"><button class="playoff-pick ${pick===g.a?'selected':''}" data-key="${esc(g.key)}" data-pick="${esc(g.a)}">${identityHTML(y,g.a,g.aTeam,'stand-logo')}</button>${playoffScoreInput(g,g.a)}</div><div class="playoff-score-side"><button class="playoff-pick ${pick===g.b?'selected':''}" data-key="${esc(g.key)}" data-pick="${esc(g.b)}">${identityHTML(y,g.b,g.bTeam,'stand-logo')}</button>${playoffScoreInput(g,g.b)}</div>${pick===PLAYOFF_TIE?'<div class="playoff-tie-label">Projected tie</div>':''}</div>`}).join('')}</div>`:'<p class="muted">No remaining games.</p>';
+    return `<div class="playoff-game"><div class="playoff-score-side"><button class="playoff-pick ${pick===g.a?'selected':''}" data-key="${esc(g.key)}" data-pick="${esc(g.a)}">${identityHTML(y,g.a,g.aTeam,'stand-logo')}</button>${playoffScoreInput(g,g.a)}</div><div class="playoff-score-side"><button class="playoff-pick ${pick===g.b?'selected':''}" data-key="${esc(g.key)}" data-pick="${esc(g.b)}">${identityHTML(y,g.b,g.bTeam,'stand-logo')}</button>${playoffScoreInput(g,g.b)}</div><button type="button" class="playoff-tie-button ${pick===PLAYOFF_TIE?'selected':''}" data-key="${esc(g.key)}" aria-pressed="${pick===PLAYOFF_TIE}" aria-label="Pick a tie for ${esc(g.aTeam)} and ${esc(g.bTeam)}">Tie</button></div>`}).join('')}</div>`:'<p class="muted">No remaining games.</p>';
   future.querySelectorAll('.playoff-pick').forEach(b=>b.onclick=()=>{if(playoffPicks.get(b.dataset.key)===b.dataset.pick)playoffPicks.delete(b.dataset.key);else playoffPicks.set(b.dataset.key,b.dataset.pick);renderPlayoffMachine();scheduleConditionalOdds()});
+  future.querySelectorAll('.playoff-tie-button').forEach(b=>b.onclick=()=>{
+    if(playoffPicks.get(b.dataset.key)===PLAYOFF_TIE)playoffPicks.delete(b.dataset.key);
+    else playoffPicks.set(b.dataset.key,PLAYOFF_TIE);
+    renderPlayoffMachine();scheduleConditionalOdds();
+  });
   future.querySelectorAll('.playoff-score-input').forEach(input=>{
     input.addEventListener('input',()=>{
       const key=playoffScoreKey(input.dataset.key,input.dataset.owner),raw=input.value.trim();
@@ -467,9 +566,10 @@ function renderPlayoffMachine(){
   renderPlayoffStandings(y,pairs,remaining);
 }
 function renderPlayoffStandings(y,pairs,remaining){
-  clinchStandingsStyles();const clinch=playoffClinchMarks(y,pairs);const {standings,tieInfo}=simulatedStandings(y,pairs),picked=remaining.filter(g=>playoffPicks.has(g.key)).length;
-  document.querySelector('#playoffStandings').innerHTML=standings.map((t,i)=>{const rec=t.t?`${t.w}-${t.l}-${t.t}`:`${t.w}-${t.l}`;const ti=teamInfo(y,t.owner,t.team);return `<tr class="${i<6?'playoff-in':''}"><td><strong>#${i+1}</strong></td><td><div class="clinch-team-cell">${playoffStatusHTML(clinch.get(t.owner))}<div class="playoff-team-cell"><img class="stand-logo" ${logoAttrs(ti.logo)} alt=""><div class="playoff-team-copy"><div class="playoff-team-name"><strong>${esc(ti.team)}</strong>${tiebreakInfoHTML(tieInfo.get(t.owner))}</div><small>${esc(t.owner)}</small></div></div></div></td><td><strong>${rec}</strong></td><td>${fmt(t.pf)}</td><td>${fmt(t.pa)}</td><td>${i<2?'1st Round Bye':i<6?'Playoffs':'Eliminated'}</td>${Array.from({length:9},(_,j)=>`<td class="conditional-odds ${j===8?'odds-total':j<2?'odds-bye':j>5?'odds-out':''}" data-owner="${esc(t.owner)}" data-seed="${j}">—</td>`).join('')}</tr>`}).join('');
+  clinchStandingsStyles();const clinch=playoffPicks.size?projectedScenarioMarks:actualScenarioMarks;const {standings,tieInfo}=simulatedStandings(y,pairs),picked=remaining.filter(g=>playoffPicks.has(g.key)).length;
+  document.querySelector('#playoffStandings').innerHTML=standings.map((t,i)=>{const rec=t.t?`${t.w}-${t.l}-${t.t}`:`${t.w}-${t.l}`;const ti=teamInfo(y,t.owner,t.team);return `<tr data-owner="${esc(t.owner)}" class="${i<6?'playoff-in':''}"><td><strong>#${i+1}</strong></td><td><div class="clinch-team-cell">${playoffStatusHTML(clinch.get(t.owner))}<div class="playoff-team-cell"><img class="stand-logo" ${logoAttrs(ti.logo)} alt=""><div class="playoff-team-copy"><div class="playoff-team-name"><strong>${esc(ti.team)}</strong>${tiebreakInfoHTML(tieInfo.get(t.owner))}</div><small>${esc(t.owner)}</small></div></div></div></td><td><strong>${rec}</strong></td><td>${fmt(t.pf)}</td><td>${fmt(t.pa)}</td><td>${i<2?'1st Round Bye':i<6?'Playoffs':'Eliminated'}</td>${Array.from({length:9},(_,j)=>`<td class="conditional-odds ${j===8?'odds-total':j<2?'odds-bye':j>5?'odds-out':''}" data-owner="${esc(t.owner)}" data-seed="${j}">—</td>`).join('')}</tr>`}).join('');
   if(window.playoffOddsLast)paintConditionalOdds(window.playoffOddsLast);
+  startProjectedClinchMarks();
   document.querySelector('#playoffProgress').textContent=remaining.length?`${picked} of ${remaining.length} remaining games selected`:'Regular season complete.';
 }
 
@@ -499,7 +599,7 @@ function seedSimulatedSeason(owners,stats,h2h){
       let candidates=[...rem];
       if(valid){const best=Math.max(...candidates.map(t=>{const r=rec.get(t.owner);return(r.w+.5*r.t)/r.g}));candidates=candidates.filter(t=>{const r=rec.get(t.owner);return Math.abs((r.w+.5*r.t)/r.g-best)<1e-12})}
       if(candidates.length>1){const best=Math.max(...candidates.map(t=>t.pf));candidates=candidates.filter(t=>Math.abs(t.pf-best)<1e-9)}
-      if(candidates.length>1){const best=Math.min(...candidates.map(t=>t.pa));candidates=candidates.filter(t=>Math.abs(t.pa-best)<1e-9)}
+      if(candidates.length>1){const best=Math.max(...candidates.map(t=>t.pa));candidates=candidates.filter(t=>Math.abs(t.pa-best)<1e-9)}
       // Exact simulated ties after all known tiebreakers are vanishingly rare; randomize the unresolved coin-flip step.
       const winner=candidates.length===1?candidates[0]:candidates[Math.floor(Math.random()*candidates.length)];
       seeded.push(winner);rem.splice(rem.findIndex(t=>t.owner===winner.owner),1);

@@ -163,3 +163,39 @@ footer a:hover {
 /* Clinching key: use the same subtle footnote treatment on both standings tables. */
 .clinch-key{margin-top:14px!important;margin-bottom:0!important;line-height:1.6}
 .clinch-key strong{color:inherit;font-size:inherit;font-weight:800}
+
+/* Upcoming-week clinching scenarios */
+.playoff-scenarios-card #playoffScenarios>h2{margin:0 0 10px}.scenario-team{padding:18px 0;border-top:1px solid var(--border,#ddd)}.scenario-team h3{margin:0 0 12px}.scenario-milestone{margin:0 0 15px}.scenario-milestone h4{margin:0 0 7px}.scenario-milestone p{margin:5px 0;line-height:1.5}
+
+/* Playoff Machine: team-specific scenarios, explicit tie controls, mobile layout */
+.playoff-machine-main>.playoff-schedule-card{order:2}
+.playoff-machine-main>.playoff-scenarios-card{order:3}
+.playoff-machine-main>.card:not(.playoff-schedule-card):not(.playoff-scenarios-card){order:1}
+.scenario-picker{display:flex;flex-direction:column;gap:8px;margin:18px 0 16px;max-width:420px}
+.scenario-picker label{font-size:.76rem;color:var(--muted);font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.scenario-picker select{width:100%;min-height:46px;padding:11px 40px 11px 13px;border-radius:10px;border:1px solid var(--line);background:#0d1014;color:var(--text);font:inherit;font-weight:800}
+.scenario-picker select:focus-visible,.playoff-tie-button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.scenario-explanation{margin:0 0 18px;font-size:.8rem}.scenario-empty{padding:18px 0}
+.playoff-tie-button{width:100%;min-height:35px;background:#111820;border:1px solid var(--line);color:var(--muted);border-radius:9px;font:inherit;font-size:.8rem;font-weight:900;cursor:pointer;transition:background .15s,border-color .15s}
+.playoff-tie-button:hover{border-color:var(--accent);color:var(--text)}
+.playoff-tie-button.selected{background:rgba(243,255,0,.12);border-color:var(--accent);color:var(--accent)}
+.playoff-game{min-width:0}.playoff-score-side{min-width:0}
+@media(max-width:700px){
+ .playoff-machine-main{min-width:0;padding-top:16px}
+ .playoff-schedule-card .playoff-quick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .playoff-schedule-card .playoff-quick>span{grid-column:1/-1}
+ .playoff-schedule-card .playoff-quick button{min-width:0;padding:11px 8px;font-size:.77rem}
+ .playoff-game-list{grid-template-columns:1fr;gap:12px}
+ .playoff-game{padding:12px;border:1px solid var(--line);border-radius:12px;gap:8px}
+ .playoff-score-side{flex:1 1 auto;display:grid;grid-template-columns:minmax(0,1fr) 84px;gap:8px;width:100%}
+ .playoff-score-side .playoff-pick{min-width:0;min-height:52px;padding:9px 10px}
+ .playoff-score-side .playoff-score-input{width:84px;max-width:100%;min-width:0;padding:9px 5px}
+ .playoff-pick .stand-logo{width:30px;height:30px}
+ .playoff-tie-button{min-height:39px}
+ .playoff-week-tabs{grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
+ .playoff-week-tab{padding:12px 4px;font-size:.8rem}
+ .scenario-picker{max-width:none}
+ .scenario-milestone p{overflow-wrap:anywhere}
+ .playoff-scenarios-card,.playoff-schedule-card{min-width:0}
+}
+@media(max-width:380px){.playoff-score-side{grid-template-columns:minmax(0,1fr) 72px}.playoff-score-side .playoff-score-input{width:72px}.playoff-schedule-card .playoff-quick button{font-size:.72rem}}
