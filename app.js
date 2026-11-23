@@ -154,9 +154,46 @@ function renderRecordRows(id,items,valueFn,detailFn){const el=document.querySele
 function recordGameHTML(x,i,label,value){const winner=teamInfo(x.year,x.owner,x.team),loser=teamInfo(x.year,x.opponent,x.opponent);return `<article class="record-game"><div class="record-game-head"><span>#${i+1} • ${esc(x.year)} • ${esc(displayWeek(x.week))}</span><strong>${esc(value)}${label?' '+esc(label):''}</strong></div><div class="game-team winner">${recordIdentity(x.year,x.owner,winner.team)}<span class="game-score">${fmt(x.score)}</span></div><div class="game-team loser">${recordIdentity(x.year,x.opponent,loser.team)}<span class="game-score">${fmt(x.oppScore)}</span></div></article>`}
 function renderRecordGames(id,items,kind){const el=document.querySelector(id);if(!el)return;el.innerHTML=items.map((x,i)=>{const value=kind==='total'?fmt(x.score+x.oppScore):fmt(Math.abs(x.score-x.oppScore));return recordGameHTML(x,i,kind==='total'?'total':'pts',value)}).join('')||'<p class="muted">No record data.</p>'}
 function oldestRecordFirst(a,b){return (+a.year-+b.year)||((weekOrder(a.week)||0)-(weekOrder(b.week)||0))}
-function calculateStreaks(type){const out=[];const owners=[...new Set(ledger.map(x=>x.owner))];for(const owner of owners){const years=[...new Set(ledger.filter(x=>x.owner===owner).map(x=>x.year))];for(const year of years){const games=ledger.filter(x=>x.owner===owner&&x.year===year).sort((a,b)=>weekOrder(a.week)-weekOrder(b.week));let n=0,best=0;for(const g of games){if(g.outcome===type){n++;best=Math.max(best,n)}else if(g.outcome==='w'||g.outcome==='l')n=0}if(best){const sample=games.find(g=>g.team)||games[0];out.push({owner,year,team:sample?.team||owner,streak:best})}}}return out.sort((a,b)=>b.streak-a.streak||oldestRecordFirst(a,b)).slice(0,5)}
+function calculateStreaks(type){
+  const out=[];
+  const owners=[...new Set(ledger.map(x=>x.owner))];
+  for(const owner of owners){
+    const years=[...new Set(ledger.filter(x=>x.owner===owner).map(x=>x.year))];
+    for(const year of years){
+      const games=ledger.filter(x=>x.owner===owner&&x.year===year)
+        .sort((a,b)=>weekOrder(a.week)-weekOrder(b.week));
+      let current=0,startWeek=null,best=0,bestStart=null,bestEnd=null;
+      for(const g of games){
+        if(g.outcome===type){
+          if(current===0)startWeek=g.week;
+          current++;
+          if(current>best){
+            best=current;
+            bestStart=startWeek;
+            bestEnd=g.week; // When this record length was first reached.
+          }
+        }else if(g.outcome==='w'||g.outcome==='l'||g.outcome==='t'){
+          current=0;
+          startWeek=null;
+        }
+      }
+      if(best){
+        const sample=games.find(g=>g.team)||games[0];
+        out.push({owner,year,team:sample?.team||owner,streak:best,
+          startWeek:bestStart,endWeek:bestEnd,week:bestEnd});
+      }
+    }
+  }
+  // Ties in length: earliest season, then earliest week the streak reached that length.
+  return out.sort((a,b)=>b.streak-a.streak||oldestRecordFirst(a,b)).slice(0,5);
+}
+function streakRecordDetail(x){
+  const a=String(x.startWeek),b=String(x.endWeek);
+  const range=a===b?displayWeek(a):(/^\d+$/.test(a)&&/^\d+$/.test(b)?`Weeks ${a}–${b}`:`${displayWeek(a)} – ${displayWeek(b)}`);
+  return `${esc(x.year)} • ${esc(range)}`;
+}
 function calculateSeasons(){const completedYears=new Set(ledger.filter(x=>String(x.week).trim()==='14').map(x=>x.year));const map=new Map;for(const x of ledger.filter(x=>completedYears.has(x.year)&&/^\d+$/.test(String(x.week).trim())&&Number(x.week)<=14)){const k=`${x.year}|${x.owner}`;if(!map.has(k))map.set(k,{year:x.year,owner:x.owner,team:x.team,score:0});map.get(k).score+=x.score}return [...map.values()]}
-function renderRecords(){const all=[...ledger].filter(x=>x.outcome==='w'||x.outcome==='l');renderRecordRows('#highestScores',[...all].sort((a,b)=>b.score-a.score||oldestRecordFirst(a,b)).slice(0,10),x=>fmt(x.score),x=>`${esc(x.year)} • ${esc(displayWeek(x.week))}`);renderRecordRows('#lowestScores',[...all].sort((a,b)=>a.score-b.score||oldestRecordFirst(a,b)).slice(0,10),x=>fmt(x.score),x=>`${esc(x.year)} • ${esc(displayWeek(x.week))}`);const wins=ledger.filter(x=>x.outcome==='w');renderRecordGames('#closestGames',[...wins].sort((a,b)=>Math.abs(a.score-a.oppScore)-Math.abs(b.score-b.oppScore)||oldestRecordFirst(a,b)).slice(0,10),'margin');renderRecordGames('#biggestBlowouts',[...wins].sort((a,b)=>Math.abs(b.score-b.oppScore)-Math.abs(a.score-a.oppScore)||oldestRecordFirst(a,b)).slice(0,10),'margin');renderRecordRows('#winStreaks',calculateStreaks('w'),x=>`W${x.streak}`,x=>esc(x.year));renderRecordRows('#lossStreaks',calculateStreaks('l'),x=>`L${x.streak}`,x=>esc(x.year));const seasons=calculateSeasons();renderRecordRows('#highSeasons',[...seasons].sort((a,b)=>b.score-a.score||oldestRecordFirst(a,b)).slice(0,5),x=>fmt(x.score),x=>esc(x.year));renderRecordRows('#lowSeasons',[...seasons].sort((a,b)=>a.score-b.score||oldestRecordFirst(a,b)).slice(0,5),x=>fmt(x.score),x=>esc(x.year));renderRecordGames('#highMatchups',[...wins].sort((a,b)=>(b.score+b.oppScore)-(a.score+a.oppScore)||oldestRecordFirst(a,b)).slice(0,5),'total');renderRecordGames('#lowMatchups',[...wins].sort((a,b)=>(a.score+a.oppScore)-(b.score+b.oppScore)||oldestRecordFirst(a,b)).slice(0,5),'total')}
+function renderRecords(){const all=[...ledger].filter(x=>x.outcome==='w'||x.outcome==='l');renderRecordRows('#highestScores',[...all].sort((a,b)=>b.score-a.score||oldestRecordFirst(a,b)).slice(0,10),x=>fmt(x.score),x=>`${esc(x.year)} • ${esc(displayWeek(x.week))}`);renderRecordRows('#lowestScores',[...all].sort((a,b)=>a.score-b.score||oldestRecordFirst(a,b)).slice(0,10),x=>fmt(x.score),x=>`${esc(x.year)} • ${esc(displayWeek(x.week))}`);const wins=ledger.filter(x=>x.outcome==='w');renderRecordGames('#closestGames',[...wins].sort((a,b)=>Math.abs(a.score-a.oppScore)-Math.abs(b.score-b.oppScore)||oldestRecordFirst(a,b)).slice(0,10),'margin');renderRecordGames('#biggestBlowouts',[...wins].sort((a,b)=>Math.abs(b.score-b.oppScore)-Math.abs(a.score-a.oppScore)||oldestRecordFirst(a,b)).slice(0,10),'margin');renderRecordRows('#winStreaks',calculateStreaks('w'),x=>`W${x.streak}`,streakRecordDetail);renderRecordRows('#lossStreaks',calculateStreaks('l'),x=>`L${x.streak}`,streakRecordDetail);const seasons=calculateSeasons();renderRecordRows('#highSeasons',[...seasons].sort((a,b)=>b.score-a.score||oldestRecordFirst(a,b)).slice(0,5),x=>fmt(x.score),x=>esc(x.year));renderRecordRows('#lowSeasons',[...seasons].sort((a,b)=>a.score-b.score||oldestRecordFirst(a,b)).slice(0,5),x=>fmt(x.score),x=>esc(x.year));renderRecordGames('#highMatchups',[...wins].sort((a,b)=>(b.score+b.oppScore)-(a.score+a.oppScore)||oldestRecordFirst(a,b)).slice(0,5),'total');renderRecordGames('#lowMatchups',[...wins].sort((a,b)=>(a.score+a.oppScore)-(b.score+b.oppScore)||oldestRecordFirst(a,b)).slice(0,5),'total')}
 
 function setupManagerPage(){
   const owners=[...new Set(ledger.map(x=>x.owner).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),sel=document.querySelector('#managerSelect');
