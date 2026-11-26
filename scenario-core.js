@@ -26,26 +26,77 @@ function addGame(p,hg,hp,g,v,sign){
 // Returns all possible ranks of one team within its tied-record group, allowing
 // every unresolved PF/PA or ESPN coin-flip ordering. After ONE winner is selected,
 // head-to-head is recalculated for the surviving tie group.
+
 function tieRange(target,mask,hg,hp,n){
   const memo=new Map();
+
   const visit=(m)=>{
     if(m===(1<<target))return [1,1];
     if(memo.has(m))return memo.get(m);
-    const ids=[];for(let i=0;i<n;i++)if(m&(1<<i))ids.push(i);
+
+    const ids=[];
+    for(let i=0;i<n;i++)if(m&(1<<i))ids.push(i);
+
     const totals=[],counts=[];
-    for(const i of ids){let pts=0,games=0;for(const j of ids){pts+=hp[i*LIMIT+j];games+=hg[i*LIMIT+j]}totals.push(pts);counts.push(games)}
+    for(const i of ids){
+      let pts=0,games=0;
+      for(const j of ids){
+        pts+=hp[i*LIMIT+j];
+        games+=hg[i*LIMIT+j];
+      }
+      totals.push(pts);
+      counts.push(games);
+    }
+
     const h2hOK=counts[0]>0&&counts.every(x=>x===counts[0]);
     const highest=h2hOK?Math.max(...totals):null;
-    const winners=h2hOK?ids.filter((_,k)=>totals[k]===highest):ids;
-    let min=Infinity,max=-Infinity;
-    for(const winner of winners){
-      if(winner===target){min=1;max=Math.max(max,1)}
-      else{const r=visit(m&~(1<<winner));min=Math.min(min,1+r[0]);max=Math.max(max,1+r[1])}
+    const candidates=h2hOK
+      ?ids.filter((_,k)=>totals[k]===highest)
+      :ids;
+
+    // A smaller leading group must be ranked independently
+    // from the teams that did not qualify for that group.
+    if(candidates.length<ids.length){
+      const candidateMask=candidates.reduce((m,i)=>m|(1<<i),0);
+      const lower=ids.filter(i=>!candidates.includes(i));
+
+      if(candidates.includes(target)){
+        const result=visit(candidateMask);
+        memo.set(m,result);
+        return result;
+      }
+
+      const lowerMask=lower.reduce((m,i)=>m|(1<<i),0);
+      const result=visit(lowerMask);
+      const shifted=[result[0]+candidates.length,result[1]+candidates.length];
+
+      memo.set(m,shifted);
+      return shifted;
     }
-    const result=[min,max];memo.set(m,result);return result;
+
+    // No smaller group was established. Explore every possible
+    // winner, then reapply H2H among the remaining tied teams.
+    let min=Infinity,max=-Infinity;
+
+    for(const winner of candidates){
+      if(winner===target){
+        min=1;
+        max=Math.max(max,1);
+      }else{
+        const result=visit(m&~(1<<winner));
+        min=Math.min(min,1+result[0]);
+        max=Math.max(max,1+result[1]);
+      }
+    }
+
+    const result=[min,max];
+    memo.set(m,result);
+    return result;
   };
+
   return visit(mask);
 }
+
 function rankRange(target,p,hg,hp,n){
   let ahead=0,group=0;
   for(let i=0;i<n;i++){if(p[i]>p[target])ahead++;if(p[i]===p[target])group|=1<<i}
