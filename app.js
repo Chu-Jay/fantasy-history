@@ -551,10 +551,29 @@ function simulatedStandings(year,pairs){
       const counts=[...rec.values()].map(r=>r.g),valid=counts[0]>0&&counts.every(n=>n===counts[0]);
       let candidates=[...rem],steps=[];
       if(valid){
-        const vals=candidates.map(t=>({t,p:(rec.get(t.owner).w+.5*rec.get(t.owner).t)/rec.get(t.owner).g})),best=Math.max(...vals.map(x=>x.p));
-        candidates=vals.filter(x=>Math.abs(x.p-best)<1e-12).map(x=>x.t);
-        steps.push(`H2H: ${names.map(n=>{const r=rec.get(n);return `${n} ${r.w}-${r.l}${r.t?`-${r.t}`:''}`}).join(' • ')}`);
-      }else steps.push('H2H skipped: tied teams have not played the same number of head-to-head games.');
+  const vals=candidates.map(t=>({
+    t,
+    p:(rec.get(t.owner).w+.5*rec.get(t.owner).t)/rec.get(t.owner).g
+  }));
+  const best=Math.max(...vals.map(x=>x.p));
+  candidates=vals.filter(x=>Math.abs(x.p-best)<1e-12).map(x=>x.t);
+
+  steps.push(`H2H: ${names.map(n=>{
+    const r=rec.get(n);
+    return `${n} ${r.w}-${r.l}${r.t?`-${r.t}`:''}`;
+  }).join(' • ')}`);
+
+  // If a smaller group remains tied, restart the tiebreaker
+  // process with only those teams before moving to Points For.
+  if(candidates.length>1&&candidates.length<rem.length){
+    const lower=rem.filter(t=>!candidates.some(c=>c.owner===t.owner));
+    seeded.push(...seedTie(candidates));
+    seeded.push(...seedTie(lower));
+    return seeded;
+  }
+}else{
+  steps.push('H2H skipped: tied teams have not played the same number of head-to-head games.');
+}
       if(candidates.length>1){const best=Math.max(...candidates.map(t=>Math.round(t.pf*100)));candidates=candidates.filter(t=>Math.round(t.pf*100)===best);steps.push(`Points For: ${rem.map(t=>`${t.owner} ${fmt(t.pf)}`).join(' • ')}`)}
       if(candidates.length>1){const best=Math.max(...candidates.map(t=>Math.round(t.pa*100)));candidates=candidates.filter(t=>Math.round(t.pa*100)===best);steps.push(`Points Against: ${rem.map(t=>`${t.owner} ${fmt(t.pa)}`).join(' • ')}`)}
       if(candidates.length>1){candidates.sort((a,b)=>a.owner.localeCompare(b.owner));steps.push('Still tied after known tiebreakers; stable display order is used until ESPN resolves the final tie.')}
@@ -634,7 +653,23 @@ function seedSimulatedSeason(owners,stats,h2h){
       for(const g of h2h){if(!set.has(g.a)||!set.has(g.b))continue;const a=rec.get(g.a),b=rec.get(g.b);a.g++;b.g++;if(g.winner===g.a){a.w++;b.l++}else if(g.winner===g.b){b.w++;a.l++}else{a.t++;b.t++}}
       const counts=[...rec.values()].map(r=>r.g),valid=counts[0]>0&&counts.every(n=>n===counts[0]);
       let candidates=[...rem];
-      if(valid){const best=Math.max(...candidates.map(t=>{const r=rec.get(t.owner);return(r.w+.5*r.t)/r.g}));candidates=candidates.filter(t=>{const r=rec.get(t.owner);return Math.abs((r.w+.5*r.t)/r.g-best)<1e-12})}
+      if(valid){
+  const best=Math.max(...candidates.map(t=>{
+    const r=rec.get(t.owner);
+    return(r.w+.5*r.t)/r.g
+  }));
+
+  candidates=candidates.filter(t=>{
+    const r=rec.get(t.owner);
+    return Math.abs((r.w+.5*r.t)/r.g-best)<1e-12;
+  });
+
+  // Reapply head-to-head to a smaller group of teams still tied.
+  if(candidates.length>1&&candidates.length<rem.length){
+    const lower=rem.filter(t=>!candidates.some(c=>c.owner===t.owner));
+    return [...breakTie(candidates),...breakTie(lower)];
+  }
+}
       if(candidates.length>1){const best=Math.max(...candidates.map(t=>t.pf));candidates=candidates.filter(t=>Math.abs(t.pf-best)<1e-9)}
       if(candidates.length>1){const best=Math.max(...candidates.map(t=>t.pa));candidates=candidates.filter(t=>Math.abs(t.pa-best)<1e-9)}
       // Exact simulated ties after all known tiebreakers are vanishingly rare; randomize the unresolved coin-flip step.
